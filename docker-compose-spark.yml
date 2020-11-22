@@ -11,6 +11,7 @@ services:
       - ./spark:/home/jovyan/work/spark
       - ./pytorch:/home/jovyan/work/pytorch
       - ./images:/home/jovyan/work/images
+      - ./notebooks:/home/jovyan/work/notebooks
     networks:
       - data-science
 
