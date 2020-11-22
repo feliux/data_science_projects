@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  pytorch:
+    container_name: pytorch-gpu
+    image: feliux/gpu-scipy-pytorch-notebook:1.0.0
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./data:/home/jovyan/work/data
+      - ./pytorch:/home/jovyan/work/pytorch
+      - ./images:/home/jovyan/work/images
+    networks:
+      - data-science
+
+networks:
+  data-science:

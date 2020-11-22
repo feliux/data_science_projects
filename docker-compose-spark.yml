@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  ds-lab:
+    container_name: ds-lab
+    image: jupyter/all-spark-notebook:latest
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./data:/home/jovyan/work/data
+      - ./spark:/home/jovyan/work/spark
+      - ./pytorch:/home/jovyan/work/pytorch
+      - ./images:/home/jovyan/work/images
+    networks:
+      - data-science
+
+networks:
+  data-science:
