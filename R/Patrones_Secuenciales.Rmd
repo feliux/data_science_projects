@@ -1,0 +1,76 @@
+---
+title: "Patrones Secuenciales"
+output:
+  html_document: default
+  word_document: default
+---
+
+Se cargan las librerias para el an�lisis de secuencias de estado o eventos; TraMineR
+```{r}
+if(! "TraMineR" %in% installed.packages()) install.packages("TraMineR", depend = TRUE)
+if(! "knitr" %in% installed.packages()) install.packages("knitr", depend = TRUE)
+library(TraMineR)
+library(knitr)
+```
+
+Partimos de un dataset (mvad) que est� incluido en el paquete TraMineR y es un dataframe en el que se estudia la transici�n de estados desde la escuela al trabajo. Proviene de un estudio de McVivar y Anyadike-Danes y contiene la "vida laboral" de 712 personas desde Julio de 1993 a Junio de 1999
+```{r}
+data(mvad)
+summary(mvad)
+kable(head(mvad[,1:16]))
+```
+
+
+Los diferentes estados por los que puede pasar una persona seg�n este dataset son: empleado, educaci�n superior, educacion universitaria, desempleado, en la escuela y form�ndose. Aqu� podemos observar como se ven las tres primeras secuencias en formato crudo y de forma m�s agregada utilizando la funci�n print() con el par�metro format = "SPS"
+```{r}
+mvad.labels <- c("employment", "further education", "higher education","joblessness", "school", "training")
+mvad.scode <- c("EM", "FE", "HE", "JL", "SC", "TR")
+mvad.seq <- seqdef(mvad, 17:86, labels = mvad.labels, xtstep = 6)
+
+head(mvad.seq, n=3)
+print(head(mvad.seq, n=3), format = "SPS")
+
+seqiplot(mvad.seq, border = NA, tlim = 1:3, title = "Tres primeras secuencias")
+
+```
+
+
+Tabla de secuencias frecuente y la gr�fica correspondiente. Por defecto se muestran las diez m�s seguidas pero se puede modificar con el par�metro tlim
+```{r}
+seqtab(mvad.seq, tlim = 1:10)
+seqfplot(mvad.seq, border = NA, tlim = 1:10, title = "Diez secuencias m�s seguidas")
+
+```
+
+Tabla de secuencias frecuentes con una variable de agrupaci�n, en este caso "male" del dataframe original mvad, es decir que podemos comparar las trayectorias m�s seguidas por hombres y mujeres
+```{r}
+
+seqfplot(mvad.seq, border = NA, tlim = 1:10, group = mvad$male)
+
+```
+
+
+
+Tabla de distribuci�n de estados por periodo (mes en este caso) y la gr�fica correspondiente
+```{r}
+
+seqstatd(mvad.seq)
+seqdplot(mvad.seq)
+
+```
+A medida que pasa el tiempo el estado m�s frecuente al final del periodo de estudio, como es obvio es que la persona est� trabajando (es casi el 60% de los estados de los usuarios en los �ltimos meses)
+
+Tiempo medio en cada estado
+```{r}
+
+seqmtplot(mvad.seq, title = "Tiempo medio por estado")
+
+```
+
+Buscar una secuencia que cumpla alg�n patr�n, por ejemplo, secuencias con FE, HE y employment
+```{r}
+indice <- seqpm(mvad.seq, "FEHEemployment")
+indice
+mvad.seq[indice$MIndex,]
+
+```

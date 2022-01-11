@@ -84,12 +84,9 @@ $ docker exec -t <container_name> jupyter-notebook list
 ## Folder structure
 
 ~~~
-├── data -> datasets used on notebooks. on_time_performance_2016_12.csv dataset (spark) is not available cause it exceed 100MB permited on Github.
+├── data    -> datasets used on notebooks. on_time_performance_2016_12.csv dataset (spark) is not available cause it exceed 100MB permited on Github.
 │   └── pytorch_data
-│       └── MNIST
-│           ├── processed
-│           └── raw
-├── images -> images used on notebooks.
+├── images  -> images used on notebooks.
 ├── pytorch -> deep learning notebooks. This notebooks imports pytorch with CUDA 10.2 compatibility (it was installed at Dockerfile).
-└── spark -> machine learning with pyspark, sparkSQL, sparkml, sparkmllib.
+└── spark   -> machine learning with pyspark, sparkSQL, sparkml, sparkmllib.
 ~~~

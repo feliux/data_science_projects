@@ -1,0 +1,46 @@
+---
+title: "Actividad colaborativa"
+author: "Félix Rodríguez Lagonell"
+output: html_document
+---
+
+Se pretende realizar algunas operaciones para la limpieza del siguiente dataset: http://stat405.had.co.nz/data/billboard.csv
+
+En un principio sería cambiar los nombres de las columnas...
+
+```{r numeric, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+# Creamos directorio y descargamos datos
+
+if (!file.exists("./datos/billboard.csv")) {
+        dir.create("./datos")
+  fileURL <- "http://stat405.had.co.nz/data/billboard.csv"
+  download.file(fileURL,destfile="./datos/billboard.csv",method="curl")
+}
+
+
+df <- read.table("./datos/billboard.csv", 
+                         row.names=NULL, sep=",", header=TRUE)
+
+# Seleccionamos columnas
+cl <- colnames(df)
+
+# Eliminamos 'x'
+cl <- gsub("x","", cl)
+
+# Eliminamos '.'
+cl <- gsub("[.]","", cl)
+
+# Una inspección de las columnas sugiere hacer una búsqueda 'week'
+# para saber en qué columna empiezan los números de semana.
+# En este caso la columna 8
+grep("week", cl)[1]
+
+# Eliminamos letras en columna 8 en adelante.
+dm <- gsub("([a-z])", "\\2", cl, perl = T, )[8:83]
+
+# Renombramos
+colnames(df) <- c(colnames(df)[1:7], dm)
+colnames(df)
+
+```

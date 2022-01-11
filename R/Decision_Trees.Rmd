@@ -1,0 +1,197 @@
+---
+title: "Árboles de Decision y Ramdon Forest"
+output: html_document
+---
+
+Cargamos las librer�as necesarias para ejecutar �rboles de Decisi�n
+```{r}
+if(! "partykit" %in% installed.packages()) install.packages("partykit", depend = TRUE)
+if(! "rpart" %in% installed.packages()) install.packages("rpart", depend = TRUE)
+if(! "randomForest" %in% installed.packages()) install.packages("randomForest", depend = TRUE)
+
+library(partykit)
+library(rpart)
+library(randomForest)
+
+```
+
+
+Cargamos el famoso dataset iris sobre el que realizaremos la clasificaci�n multiclase. La variable target es Species y puede tomar tres valores: setosa, versicolor y virginica 
+```{r}
+str(iris)
+summary(iris)
+
+```
+
+
+Creamos el conjunto de entrenamiento y test, como de costumbre
+```{r}
+
+set.seed(12345)
+train.sample <- sample(1:150,size=(100),replace=F)
+train.iris <- iris[train.sample,]
+test.iris <- iris[-train.sample,]
+dim(train.iris)
+summary(train.iris)
+dim(test.iris)
+summary(test.iris)
+
+```
+
+
+Arboles de decision con party
+------------------------
+Construimos el modelo con ctree() del paquete party  y mostramos las reglas resultado con print()
+```{r}
+
+ctree.model <- ctree(Species ~ ., data=train.iris)
+
+# Mostrar las reglas
+print(ctree.model)
+
+```
+Las reglas nos dicen claramente los valores de corte de las variables y el error en la clasificaci�n en cada nodo
+
+
+Para ver la representaci�n completa del �rbol utiizamos plot()
+```{r}
+
+# Representar el �rbol completo
+plot(ctree.model)
+
+# Representar el �rbol simplificado
+plot(ctree.model, type="simple")
+
+```
+Con la visualizaci�n, lo vemos incluso m�s claro, en el �rbol completo se puede ver la distribucion de las clases (setosa, versicolor, virginica) en cada nodo y en el �rbol simplificado la clase correspondiente a ese nodo y el error que se cometer�a (siempre en base al conjunto de entrenamiento). En ambas representaciones siempre aparece el n�mero de observaciones que va a cada nodo
+
+Por �ltimo hacemos la predicci�n sobre el conjunto de test y medimos la precisi�n con la funci�n table()
+```{r}
+
+# predict on test data
+test.iris.pred <- predict(ctree.model, newdata = test.iris)
+table(test.iris.pred, test.iris$Species)
+
+```
+Seg�n la tabla (se representan las columnas como el valor real y las filas como el valor de la predicci�n) para la clase setosa tiene una precisi�n del 100% acertando en las 13 observaciones disponibles en el dataset de test, para la versicolor hay 19 observaciones y acierta en 18 y para la virginica hay 18 observaciones y acierta en 16
+
+
+�rboles de decisi�n con random forest
+--------------------------------
+Creamos el modelo con la funci�n randomForest() utilizando los mismos datos de entrenamiento y test que para el �rbol simple. Utilizamos un n�mero de �rboles de 100 y vemos la informaci�n del modelo con las funciones print() y attributes
+```{r fig.width=7, fig.height=6}
+
+rf.model <- randomForest(Species ~ ., data=train.iris, ntree=100, proximity=TRUE)
+
+
+# Vemos la matriz de confusion para el conjunto de entrenamiento
+print(rf.model)
+
+# Vemos los atributos del modelo
+attributes(rf.model)
+
+```
+En la salida de la funci�n print() podemos ver la matriz de confusi�n sobre el conjunto de entrenamiento para ver la precisi�n en la predicci�n de cada una de las clases (especies)
+
+
+Utilizando la funci�n plot() podemos ver de que manera el n�mero de �rboles impacta en la reducci�n del error en la predicci�n de cada una de las clases.
+```{r}
+
+# plot the tree
+plot(rf.model)
+legend("top", colnames(rf.model$err.rate),col=1:4,cex=0.8,fill=1:4)
+
+```
+
+Seg�n podemos ver en la figura la clase setosa consigue una precision m�xima (error cero) con un s�lo �rbol como hemos visto en el ejemplo de �rboles simples. Versicolor tambi�n alcanza el m�nimo error con un n�mero muy bajo de �rboles, pero no desciende de un error de cerca del 0,07. Virginica padece grandes oscilaciones, se puede observar que no por utilizar m�s �rboles el error desciende y el error tampoco desciende del 0,07 de error
+
+Con la funci�n varImpPlot() podemos ver una representaci�n gr�fica de la importancia de las variables en funci�n del �ndice de Gini
+```{r}
+
+# importance of variables
+
+varImpPlot(rf.model)
+
+```
+
+Seg�n se puede ver en la gr�fica de la figura la variable que m�s impacta en la construcci�n del modelo es la anchura del p�talo (Petal.Width) y despu�s la longitud (Petal.Length)
+
+
+Por �ltimo realizamos la predicci�n sobre el conjunto de test con la funci�n predict() y obtenemos la matriz de confusi�n
+
+```{r}
+
+iris.pred <- predict(rf.model, newdata=test.iris)
+
+table(iris.pred, test.iris$Species)
+
+# The margin of a data point is the proportion of votes for the correct 
+#class minus maximum proportion of votes for otherclasses. 
+#Generally speaking, positive margin means correct classification
+
+plot(margin(rf.model, test.iris$Species))
+legend("right", colnames(rf.model$err.rate),col=1:4,cex=0.8,fill=1:4)
+
+```
+
+Comparando la matriz de confusi�n de randomForest con la implementaci�n para un s�lo �rbol con ctree() que hemos estudiado anteriormente vemos que es incluso un poquito peor en la detecci�n de la clase virginica
+
+Por otra parte representando el margen (proporci�n de votos para la clase correcta menos la m�xima proporci�n de votos de las otras clases) con la funci�n margin() podemos ver en la figura la incidencia del n�mero de �rboles en la precisi�n de las prediciones. Cuanto mayor sea el margen (cerca de uno) m�s correcta es la clasificaci�n
+
+
+
+Arboles de regresi�n con rpart.
+------------------------
+
+Cargamos en este caso el dataset bodyfat
+```{r fig.width=10, fig.height=6}
+library(rpart)
+
+data("bodyfat", package="TH.data")
+
+str(bodyfat)
+
+# Select train and test dataset
+set.seed(1234)
+ind <- sample(2, nrow(bodyfat), replace = TRUE, prob = c(0.7,0.3))
+bodyfat.train <- bodyfat[ind==1,]
+summary(bodyfat.train)
+bodyfat.test <- bodyfat[ind==2,]
+summary(bodyfat.test)
+
+# train a decision tree
+myFormula <- DEXfat ~ age + waistcirc + hipcirc + elbowbreadth + kneebreadth
+
+bodyfat_rpart <- rpart(myFormula, data = bodyfat.train, control = rpart.control(minsplit = 10))
+
+attributes(bodyfat_rpart)
+
+print(bodyfat_rpart$cptable)
+
+# get rules
+print(bodyfat_rpart)
+
+# plot tree
+plot(bodyfat_rpart)
+text(bodyfat_rpart, use.n=T)
+
+# select the tree with the minimum prediction error
+opt <- which.min(bodyfat_rpart$cptable[,"xerror"])
+cp <- bodyfat_rpart$cptable[opt, "CP"]
+bodyfat_prune <- prune(bodyfat_rpart, cp = cp)
+
+# get rules (prune)
+print(bodyfat_prune)
+
+# plot tree (prune)
+plot(bodyfat_prune)
+text(bodyfat_prune, use.n=T)
+
+# predict on test data
+DEXfat_pred <- predict(bodyfat_prune, newdata=bodyfat.test)
+xlim <- range(bodyfat$DEXfat)
+plot(DEXfat_pred ~ DEXfat, data=bodyfat.test, xlab="Observed",ylab="Predicted", ylim=xlim, xlim=xlim)
+abline(a=0, b=1)
+
+
+```
