@@ -1,0 +1,319 @@
+---
+title: "Tarea Módulo III - Machine Learning con R"
+author: "Félix Rodríguez Lagonell"
+output:
+  html_document: 
+    keep_md: yes
+---
+
+### Introducción
+
+En este informe haremos un estudio del dataset Student.zip para estudiantes de matemáticas: https://archive.ics.uci.edu/ml/machine-learning-databases/00320/student.zip
+
+Descrito en: https://archive.ics.uci.edu/ml/datasets/Student+Performance
+
+En primer lugar nos basaremos en un análisis en componentes principales (PCA) para intentar condensar la información del dataset en un pequeño conjunto de variables. Nuestro objetivo es descubrir la posible relación entre variables usando métodos de aprendizaje automático. Compararemos estos resultados con el modelo de clustering K-Means.
+
+Posteriormente intentaremos predecir la variable G3 (nota final) con los modelos supervisados KNN y SVM.
+
+### Descarga y lectura de datos
+
+El subdirectorio "datos" quedará creado en el directorio de trabajo actual, desde el que se esté ejecutando el script.
+
+```{r directorios, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+if (! "knitr" %in% installed.packages()) install.packages("knitr", dependencies=TRUE)
+if (! "dplyr" %in% installed.packages()) install.packages("dplyr", dependencies=TRUE)
+if (! "factoextra" %in% installed.packages()) install.packages("factoextra", dependencies=TRUE)
+if (! "corrplot" %in% installed.packages()) install.packages("corrplot", dependencies=TRUE)
+
+library(knitr)
+library(dplyr)
+library(factoextra)
+library(corrplot)
+
+if (!file.exists("./datos")) {
+        dir.create("./datos")
+  fileURL <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00320/student.zip"
+  download.file(fileURL,destfile="./datos/student.zip",method="curl")
+  unzip("./datos/student.zip", exdir="./datos")
+}
+
+mat <- read.table("./datos/student-mat.csv", 
+                         row.names=NULL, sep=";", header=TRUE)
+#por <- read.table("./datos/student-por.csv", 
+#                         row.names=NULL, sep=";", header=TRUE)
+
+
+```
+
+### Análisis PCA
+
+Para llevar a cabo el estudio con el algoritmo PCA, debemos eliminar de nuestro conjunto de datos las variables categóricas, pues nuestro modelo sólo es válido con variables numéricas.
+
+
+```{r numeric, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+
+mat1 <- select_if(mat, is.numeric)
+kable(head(mat1))
+dim(mat1)
+
+
+```
+
+Apliamos el algoritmo PCA mediante la función prcomp(). Con el argumento scale=TRUE centramos los datos y normalizamos a 1 la varianza.
+
+
+```{r pca, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+
+pca <- prcomp(mat1, scale=TRUE)
+names(pca)
+
+```
+
+ Esta función devuelve los siguientes valores:
+ 
+- 'center' y 'scale' contienen la media y desviación típica de las variables previa estandarización (escala original).
+- 'rotation' contiene el vector de pesos por cada componente. El producto del vector 'rotation' por nuestro conjunto de datos nos devuelve las coordenadas de los datos en el nuevo sistema rotado de coordenadas. Estos valores se calculan automáticamente con la función prcomp() y quedan guardados en pca$x.
+- 'x' coordenadas en el nuevo sistema de referencia.
+
+```{r pca2, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+
+#kable(head(pca$rotation))
+#kable(head(pca$x))
+dim(pca$x)
+
+
+```
+
+De un conjunto de datos de 15 variables obtenemos igualmente 15 componentes principales. En la siguiente gráfica podemos ver el resultado de proyectar nuestros datos sobre las dos primeras componentes:
+
+```{r plot, echo=TRUE, results='hold', message=FALSE, warning=FALSE,  error=FALSE, fig.width=7, fig.height=7}
+
+
+biplot(pca, scale = 0, cex = 0.6, col = c("blue4", "brown3"))
+
+
+```
+
+Vemos que nuestro modelo no captura de manera óptima la diversidad del conjunto de variables. Este resultado se hace patente si evaluamos la varianza explicada por cada componente:
+
+```{r pve, echo=TRUE, results='hold', message=FALSE, warning=FALSE,  error=FALSE, fig.width=5, fig.height=5}
+
+
+# Varianza explicada por cada componente
+#PVE <- 100*pca$sdev^2/sum(pca$sdev^2)
+
+# Varianza acumulada por cada componente
+#PVA <- cumsum(PVE)
+
+fviz_screeplot(pca, addlabels = TRUE, xlim = c(0, 16), ylim = c(0, 25))
+#fviz_eig(rpca)
+
+```
+
+
+Así pues, necesitamos las 7 primeras componentes para explicar tan sólo el 70% de la varianza. Para explicar aproximadamente el 90% de la varianza necesitamos las primeras 11 componentes. Por lo tanto la necesidad de elección de una mayor cantidad de componentes para que el modelo se comporte adecuadamente nos da una medida cualitativa de la dispersión del conjunto de datos.
+
+### Comparación de resultados con K-means
+
+Veamos si obtenemos un buen resultado tras nuestro análisis PCA. En primer lugar calculamos el número de clusters óptimo mediante el método de "el codo" (elbow method)
+
+```{r elbow, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE, fig.width=4, fig.height=4}
+
+wss <- (nrow(mat1)-1)*sum(apply(mat1, 2, var))
+for (i in 2:15) wss[i] <- sum(kmeans(mat1, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab=" Número de clusters",
+     ylab="Sumas de cuadrados dentro de los grupos",
+     main="Nº de clusters óptimo según Elbow",
+     pch=20, cex=2)
+
+
+```
+
+
+Agrupemos nuestro datos en base a 5 clusters:
+
+```{r kmeans, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+set.seed(8080)
+
+# Conjunto de datos
+k.mat1 <- kmeans(mat1, 5)
+k.mat1
+
+# Conjunto de datos PCA
+k.mat1.pca <- kmeans(pca$x[, 1:2], 5)
+k.mat1.pca
+
+```
+
+-----------------------------
+
+Para el modelo de clustering con los datos de PCA se han mantenido sólo las 2 primeras componentes principales, al obtener un ratio [between_SS / total_SS] mayor, nos podemos hacer una idea de la correlación entre las variables de nuestros datos: de 15 variables hemos reducido la dimensionalidad a tan sólo 2, obteniendo finalmente una mejor clusterización. A pesar de esta mejora, cabe destacar que las 2 componentes son resultado de una combinación de las 15 originales, haciendo difícil su interpretación. Una posible mejora de los resultados para el set original (15 variables) sería eliminar variables correlacionadas del conjunto, lo cual llevaremos a cabo en el próximo apartado.
+
+
+```{r corr, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE, fig.width=8, fig.height=8}
+
+mat.cor <- cor(mat1)
+
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(mat.cor, method="shade", shade.col=NA, tl.col="black", tlsrt=45, col=col(200), addCoef.col="black",
+         order="AOE", mar=c(1,0,2,0), line=-2, main="Matriz correlación matemáticas")
+
+```
+
+### Modelos no supervisado: kNN vs SVM
+
+```{r knn, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+if(! "mlbench" %in% installed.packages()) install.packages("mlbench", depend=TRUE)
+if(! "caret" %in% installed.packages()) install.packages("caret", depend=TRUE)
+if(! "ROCR" %in% installed.packages()) install.packages("ROCR", depend=TRUE)
+if(! "nloptr" %in% installed.packages()) install.packages("nloptr", depend=TRUE)
+
+library(mlbench)
+library(caret)
+library(ROCR)
+
+
+```
+
+A continuación haremos una evaluación conjunta de los modelos kNN y SVM. El objetivo es predecir el valor numérico de la nota final (G3) considerando el conjunto de 15 variables del apartado anterior. 
+
+Antes que nada creamos dataset de entrenamiento y test:
+
+```{r knn_svm, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+partition <- createDataPartition(mat1$G3, p=0.8, list=F)
+train <- mat1[partition, ]
+test <- mat1[-partition, ]
+
+# Proporción de datos
+#prop.table(table(train$G3))
+#prop.table(table(test$G3))
+
+
+```
+
+Eliminamos las variables altamente correlacionadas y aquellas que tienen varianza cero (en este caso ninguna). También centramos y escalamos las variables para reducir la desviación.
+
+```{r clean, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+# Eliminamos variables con varianza cero.
+zero.train <- nearZeroVar(train[, -dim(train)[2]], saveMetrics=F)
+colnames(train)[zero.train]
+
+# Y los que tienen alta correlación
+cor.train <- cor(train[, -dim(train)[2]])
+cor.train.index <- findCorrelation(cor.train, 0.8)
+#cor.train.index
+cor.train <- train[, -cor.train.index]
+cor.test <- train[, -cor.train.index]
+
+# Centrado y escalado. Variable objetivo
+pre <- preProcess(cor.train[, -dim(cor.train)[2]])
+
+train.prep <- predict(pre, cor.train[, -dim(cor.train)[2]])
+train.prep$G3 <- cor.train$G3
+
+test.prep <- predict(pre, cor.train[, -dim(cor.test)[2]])
+test.prep$G3 <- cor.test$G3
+
+```
+
+
+En este punto ya podemos generar los modelos kNN y SVM:
+
+
+```{r model, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+# Generación de modelo
+knn.control <- trainControl(method="repeatedcv", repeats = 5)
+svm.control <- trainControl(method="repeatedcv", repeats = 5)
+
+# Entrenamos modelo knn
+knn.mat1.model <- train(x=train.prep[, -dim(train.prep)[2]], y=train.prep$G3, method="knn",
+                        tuneLength=10, trControl=knn.control)
+knn.mat1.model
+print(plot(knn.mat1.model, metric="RMSE"))
+
+
+# Entrenamos modelo svm
+svm.mat1.model <- train(x=train.prep[, -dim(train.prep)[2]], y=train.prep$G3, method="svmRadial",
+                        tuneLength=10, trControl=svm.control)
+svm.mat1.model
+print(plot(svm.mat1.model, metric="RMSE"))
+
+```
+
+Una vez conocidos los parámetros se muestra en pantalla una breve comparación de los resultados para la primeras observaciones:
+
+```{r test, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+# Predicción sobre test
+knn.mat1.test <- predict(knn.mat1.model, newdata=test.prep[, -dim(train.prep)[2]])
+#knn.mat1.test
+
+svm.mat1.test <- predict(svm.mat1.model, newdata=test.prep[, -dim(train.prep)[2]])
+#svm.mat1.test
+
+# Comparamos predicciones
+knn.mat1.test.pred <- extractPrediction(list(model1=knn.mat1.model), 
+                                        testX = test.prep[, -dim(train.prep)[2]],
+                                        testY = test.prep$G3)
+knn.conjunto.test.preds <- subset(knn.mat1.test.pred, dataType=="Test")
+#kable(head(knn.conjunto.test.preds))
+
+
+
+svm.mat1.test.pred <- extractPrediction(list(model1=svm.mat1.model), 
+                                        testX = test.prep[, -dim(train.prep)[2]],
+                                        testY = test.prep$G3)
+svm.conjunto.test.preds <- subset(svm.mat1.test.pred, dataType=="Test")
+#kable(head(svm.conjunto.test.preds))
+
+df <- bind_cols(knn.conjunto.test.preds, svm.conjunto.test.preds)
+df <- select(df, -obs1, -object, -object1, -dataType, -dataType1, -model, -model1)
+names(df) = c("obs", "kNN", "SVM")
+kable(head(df, 5))
+
+```
+
+
+```{r knn.conclusion, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+knn.final <- data.frame(obs=test.prep$G3, pred=knn.conjunto.test.preds$pred)
+defaultSummary(knn.final)
+
+svm.final <- data.frame(obs=test.prep$G3, pred=svm.conjunto.test.preds$pred)
+defaultSummary(svm.final)
+
+```
+```{r svm.conclusion, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+svm.final <- data.frame(obs=test.prep$G3, pred=svm.conjunto.test.preds$pred)
+defaultSummary(svm.final)
+
+```
+
+```{r conclusion, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+models <- list(kNN=knn.mat1.model, SVM=svm.mat1.model)
+summary(resamples(models))
+
+```
+
+-------------
+
+Como es de esperar tenemos mejores resultados para el model SVM. A pesar de que no obtenemos un 'Rsquared' cercano a 1, nuestros modelos logran capturar la esencia de la diversidad de datos arrojando buenos resultados. Una posible mejora sería limitar aún más el número de variables predictoras así como transformar el target a binario: si G3<10 = 'fail' & G3>10 = 'pass', lo que haría nuestros modelos más restringidos.
+
+```{r dotplot, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE, fig.width=5, fig.height=5}
+
+dotplot(resamples(models))
+
+
+```

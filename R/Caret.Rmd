@@ -1,0 +1,388 @@
+---
+title: "Caret"
+output: html_document
+---
+
+Cargamos las librer�as necesarias para ejecutar el ejemplo con caret
+```{r}
+if(! "mlbench" %in% installed.packages()) install.packages("mlbench", depend = TRUE)
+if(! "caret" %in% installed.packages()) install.packages("caret", depend = TRUE)
+if(! "ROCR" %in% installed.packages()) install.packages("ROCR", depend = TRUE)
+if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
+if(! "corrplot" %in% installed.packages()) install.packages("corrplot", depend = TRUE)
+if(! "e1071" %in% installed.packages()) install.packages("e1071", depend = TRUE)
+if(! "gbm" %in% installed.packages()) install.packages("gbm", depend = TRUE)
+
+library(mlbench)
+library(caret)
+library(ROCR)
+library(dplyr)
+library(corrplot)
+library(e1071)
+library(gbm)
+
+
+```
+
+## Regresi�n Lineal con Caret
+
+Cargamos el dataset faithful
+
+Hacemos un summary() y un head() para ver su contenido
+```{r}
+summary(faithful)
+head(faithful)
+```
+
+
+Representamos gr�ficamente la relaci�n entre las dos variables: eruptions (duration) vs waiting (tiempo de espera entre erupciones)
+```{r, echo=FALSE}
+plot(faithful$waiting, faithful$eruptions,col="blue",xlab="Tiempo entre erupciones",ylab="Duracion de la Erupcion")
+```
+
+Veamos con la funci�n cor() la correlaci�n entre ambas variables. Nos dar� una pista de cuan bueno va a ser el predictor, cuanto m�s se acerque a la unidad querr� decir que m�s relacionadas est�n las variables y m�s f�cil resultar� ajustar una buena predicci�n
+```{r}
+cor(faithful$waiting, faithful$eruptions)
+```
+
+Construimos el modelo de regresi�n cl�sica utilizando caret
+```{r}
+set.seed(13579)
+index.faithful <- createDataPartition(faithful$eruptions, p=0.7, list=F)
+
+train.faithful <- faithful[index.faithful,]
+test.faithful <- faithful[ -index.faithful, ]
+
+#fitControl <- trainControl(method = "none")
+fitControl <- trainControl(method="cv", repeats=10)
+
+lm.model.caret <- train(eruptions ~ waiting ,data = train.faithful ,method = "lm", trControl = fitControl)
+print(lm.model.caret)
+
+summary(lm.model.caret$finalModel)
+
+```
+
+Prediccion y evaluacion del modelo
+```{r}
+
+lm.model.caret.predict <- predict(lm.model.caret$finalModel, newdata = test.faithful)
+print(head(lm.model.caret.predict))
+
+test.values.lm <-data.frame(obs=test.faithful$eruptions,pred=lm.model.caret.predict)
+defaultSummary(test.values.lm)
+
+```
+
+```{r echo=FALSE}
+plot(test.faithful$waiting, test.faithful$eruptions,col="red",xlab="Tiempo entre erupciones",ylab="Duracion de la Erupcion")
+# Con la funci�n abline pintamos la recta de regresi�n pas�ndole el modelo generado
+abline(lm.model.caret$finalModel)
+
+```
+
+Ahora aplicamos Random Forest para regresi�n
+```{r}
+tunegrid <- expand.grid(mtry=c(1))
+rf.reg.model <- train(eruptions ~ waiting ,data = train.faithful ,method = "rf", tuneGrid = tunegrid, trControl = fitControl)
+print(rf.reg.model)
+
+rf.reg.model.predict <- predict(rf.reg.model$finalModel, newdata = test.faithful)
+print(head(rf.reg.model.predict))
+
+test_values_rf<-data.frame(obs=test.faithful$eruptions,pred=rf.reg.model.predict)
+defaultSummary(test_values_rf)
+
+```
+
+Comparamos ambos modelos de prediccion, lm y randomForest
+```{r}
+
+reg.models <- list( lm.model.caret, rf.reg.model )
+compar.reg.models <- resamples( reg.models )
+summary( compar.reg.models )
+
+```
+
+
+## Regresion Logistica con Caret
+
+Vemos las caracter�sticas del dataset Sonar, incluyendo la proporci�n de la variable Class que es la variable objetivo
+```{r}
+data(Sonar)
+summary(Sonar)
+str(Sonar)
+prop.table( table(Sonar$Class))
+
+```
+
+Se crean los dataset de entrenamiento y test con la funci�n de caret: createDataPartition()
+```{r}
+### Creamos las particiones de entrenamiento y test para los datos de Sonar
+index.sonar <- createDataPartition(Sonar$Class, p=0.8, list=F)
+
+train.sonar <- Sonar[index.sonar,]
+test.sonar <- Sonar[ -index.sonar, ]
+
+```
+
+Comprobamos que las proporciones se mantienen en los datasets de entrenamiento y test similares a las del dataset original
+```{r}
+prop.table( table(train.sonar$Class))
+prop.table( table(test.sonar$Class))
+
+```
+Y efectivamente se mantienen...
+
+Comenzamos el preprocesado de datos
+Buscamos variables con varianza cercana a cero (casi constantes), pues no aportan al clasificador, con la funci�n nearZeroVar()
+```{r}
+
+train.sonar.predictors <- train.sonar %>% select(-Class)
+zero.var.train.sonar <- nearZeroVar( train.sonar.predictors, saveMetrics=F )
+colnames(train.sonar)[zero.var.train.sonar]
+
+# Eliminamos las columnas con varianza casi nula en caso de que haya alguna
+# train.sonar.nz <- train.sonar[,-zero.var.train.sonar]
+
+```
+
+Ahora buscamos variables fuertemente correladas con la funci�n cor() y findCorrelation()
+```{r}
+cor.train.sonar.matrix <- cor( train.sonar.predictors )
+corrplot(cor.train.sonar.matrix)
+
+# Seleccionamos los indices de las columnas con una correlaci�n mayor de 0,8
+cor.train.sonar.index <- findCorrelation( cor.train.sonar.matrix, 0.80 )
+cor.train.sonar.index
+
+cor.train.sonar <- train.sonar[,-cor.train.sonar.index]
+dim(cor.train.sonar)
+
+cor.test.sonar <- test.sonar[,-cor.train.sonar.index]
+dim(cor.test.sonar)
+
+```
+El n�mero de variables predictoras se reduce casi a la mitad quitando las que est�n correladas
+
+
+Centramos y escalamos las variables para reducir la desviaci�n con la funci�n preProcess()
+```{r}
+xTrans.sonar <- preProcess(cor.train.sonar[, -dim(cor.train.sonar)[2]], method = c("center", "scale")) 
+train.sonar.prep <- predict( xTrans.sonar, cor.train.sonar[,-dim(cor.train.sonar)[2]])
+#head(train.sonar.prep)
+train.sonar.prep$Class <- cor.train.sonar$Class
+
+test.sonar.prep <- predict( xTrans.sonar, cor.test.sonar[,-dim(cor.test.sonar)[2]], method = c("center", "scale"))
+test.sonar.prep$Class <- cor.test.sonar$Class
+
+head(train.sonar.prep)
+
+```
+
+
+Generaci�n de modelos
+Modelo KNN
+```{r}
+# Aplicamos resampling de cross validation 
+fitControl <- trainControl(method="cv", repeats=10)
+
+# Entrenamos el modelo
+knn.sonar.model <- train(x=train.sonar.prep[,-dim(train.sonar.prep)[2]], y=train.sonar.prep$Class, method="knn", tuneLength=10, trControl=fitControl)
+knn.sonar.model
+
+```
+
+Visualizamos la salida del modelo KNN
+```{r}
+
+plot1 <- plot(knn.sonar.model, metric="Accuracy")
+
+print(plot1)
+
+```
+
+Se confirma que el n�mero �ptimo de vecinos es k=5, gracias a Caret hallar este n�mero es muy sencillo
+
+Variables m�s importantes
+```{r}
+
+importance.vars <- varImp(knn.sonar.model, scale=FALSE)
+print(importance.vars)
+plot(importance.vars)
+
+control <- rfeControl(functions=rfFuncs, method="cv", number=10)
+results.rfe <- rfe(train.sonar.prep[,-dim(train.sonar.prep)[2]], train.sonar.prep$Class, sizes=c(1:20), rfeControl = control)
+plot(results.rfe, type=c("g", "o"))
+
+```
+
+Predicci�n Knn sobre el conjunto de test
+```{r}
+knn.sonar.test <- predict(knn.sonar.model, newdata= test.sonar.prep[,-dim(train.sonar.prep)[2]])
+knn.sonar.test
+
+
+```
+
+Comparaci�n de predicciones, probabilidades sobre el conjunto de test
+```{r}
+# Extracci�n de prediciones 
+knn.sonar.test.preds <- extractPrediction( list(model1=knn.sonar.model), testX=test.sonar.prep[,-dim(train.sonar.prep)[2]] , testY=test.sonar.prep$Class)
+conjunto.test.preds <- subset(knn.sonar.test.preds, dataType== "Test")
+head(conjunto.test.preds)
+
+# Extraccion de probabilidades
+knn.sonar.test.probs <- extractProb( list(model1=knn.sonar.model), testX= test.sonar.prep[,-dim(train.sonar.prep)[2]], testY=test.sonar.prep$Class)
+conjunto.test.probs <- subset(knn.sonar.test.probs, dataType== "Test")
+plotClassProbs(conjunto.test.probs )
+
+```
+Vemos en la gr�fica que las probabilidades de ser m�s certero prediciendo el valor M (1) son mayores
+
+Evaluaci�n del modelo, matriz de confusi�n y curvas ROC. Funciones confusionMatrix() y prediction()
+```{r}
+ 
+confusionMatrix(knn.sonar.test, test.sonar.prep$Class )
+
+
+# Para poder pintar la curva ROC tenemos que pasar los valores del target a 0 y 1
+pr <- prediction(ifelse(knn.sonar.test == 'M',1,0), ifelse(test.sonar.prep$Class == 'M',1,0))
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+```
+
+
+SVM
+Repetimos los mismos pasos que para Knn
+
+Utilizamos validaci�n cruzada como t�cnica de remuestreo
+Entrenamiento
+
+```{r}
+
+svm.control <- trainControl(method="cv", repeats=10)
+svm.sonar.model <- train(x=train.sonar.prep[,-dim(train.sonar.prep)[2]], y=train.sonar.prep$Class, method="svmRadial", tuneLength=10, trControl=svm.control)
+svm.sonar.model
+
+
+```
+
+
+Visualizaci�n del modelo
+```{r}
+plot1 <- plot(svm.sonar.model, metric="Accuracy")
+print(plot1)
+
+```
+
+
+Predicci�n sobre nuevos valores
+```{r}
+svm.sonar.test <- predict(svm.sonar.model, newdata= test.sonar.prep[,-dim(train.sonar.prep)[2]])
+svm.sonar.test
+
+```
+
+
+Evaluaci�n del modelo, matriz de confusi�n y curvas ROC
+```{r}
+
+confusionMatrix(svm.sonar.test, test.sonar.prep$Class )
+
+  
+pr <- prediction(ifelse(svm.sonar.test == 'M',1,0), ifelse(test.sonar.prep$Class == 'M',1,0))
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+```
+
+Comparaci�n de ambos modelos (Model1=knn, Model2=SVM) con Caret
+```{r}
+
+models <- list( knn.sonar.model, svm.sonar.model )
+compar.models <- resamples( models )
+summary( compar.models )
+
+```
+
+Visualizaci�n del rendimiento de cada modelo. Model1=knn, Model2=SVM
+```{r}
+
+dotplot( compar.models)
+
+```
+
+Se ve claramente que Model2=SVM para este caso en concreto tiene mayor precisi�n
+
+## Clasificacion Multiclase
+Utilizando gbm
+
+```{r}
+fitControl <- trainControl(classProbs = TRUE,
+                           method="repeatedcv",
+                           number=10,
+                           repeats=2,
+                           summaryFunction = defaultSummary,
+                           verboseIter=TRUE)
+
+set.seed(825)
+iris.index.train <- createDataPartition(iris$Species, p=0.7, list=F)
+iris.train <- iris[iris.index.train,]
+iris.test <- iris[-iris.index.train,]
+
+gbm.caret.model <- train(Species ~ ., data=iris.train, method="gbm", trControl=fitControl, verbose=FALSE)
+gbm.caret.pred <- predict(gbm.caret.model, iris.test)
+
+head(gbm.caret.pred)
+
+confusionMatrix(gbm.caret.pred, iris.test$Species)
+
+```
+
+Utilizando rpart
+
+```{r}
+
+tunegrid <- expand.grid(cp=c(0.1))
+
+rpart.model <- train(Species ~ ., data=iris.train, method="rpart", trControl=fitControl, tuneGrid=tunegrid)
+
+print(rpart.model)
+
+plot(rpart.model$finalModel, uniform=TRUE, main="Classification Tree for Iris")
+text(rpart.model$finalModel, use.n=TRUE, all=TRUE, cex=.8)
+
+rpart.pred <- predict(rpart.model, iris.test)
+
+head(rpart.pred)
+
+confusionMatrix(rpart.pred, iris.test$Species)
+
+```
+
+Utilizando RandomForest
+```{r}
+
+tunegrid <- expand.grid(mtry=c(1:5))
+
+rf.model <- train(Species ~ ., data=iris.train, method="rf", trControl = fitControl, tuneGrid=tunegrid)
+
+rf.pred <- predict(rf.model, iris.test)
+
+head(rf.pred)
+
+confusionMatrix(rf.pred, iris.test$Species)
+
+```
+
+Comparacion de modelos de clasificacion
+
+```{r}
+
+class.models <- list( gbm.caret.model, rpart.model, rf.model )
+compar.class.models <- resamples( class.models )
+summary( compar.class.models )
+
+```

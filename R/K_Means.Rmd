@@ -1,0 +1,182 @@
+---
+title: "K-Means"
+author: "Félix Rodríguez Lagonell"
+output:
+  html_document: default
+
+---
+
+En este informe haremos un ejemplo de implementación de K-Means en R.
+
+
+### Instalación de librerías
+
+El paquete de R que contiene el algoritmo K-Means convencional es stats del core del propio lenguaje. Por otra parte, k-medoids (PAM) se encuentra implementado en el paquete cluster.
+
+Cargamos las librerías para el acondicionamiento de los datos y de representación gráfica.
+
+```{r library, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+if (! "dplyr" %in% installed.packages()) install.packages("dplyr", dependencies=TRUE)
+if (! "plotrix" %in% installed.packages()) install.packages("plotrix", dependencies=TRUE)
+if (! "knitr" %in% installed.packages()) install.packages("knitr", dependencies=TRUE)
+
+library(dplyr)
+library(plotrix)
+library(knitr)
+
+
+```
+
+### Carga de datos
+
+Utilizaremos el famoso dataset de flores iris incluido en R. Este dataset contiene datos de la longitud y anchura del sépalo y pétalo de 50 flores de las tres especies diferentes de iris: setosa, versicolor y virgínica.
+
+
+```{r summarising, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+
+kable(summary(iris))
+
+
+```
+
+---------------------------------------
+
+Quitamos la variable 'Species' para que no se incluya en el clustering, pues condicionaría mucho el resultado. Utilizamos la función select() del paquete dplyr para retirar dicha variable:
+
+
+```{r data, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+iris.mod <- iris %>% select(-Species)
+kable(head(iris.mod))
+
+
+```
+
+---------------------------------------
+
+Dado que todas las variables son numéricas podemos aplicar el clustering con K-Means. En este caso es necesario elegir el número de clusters final (k) antes de comenzar el análisis. El método de elbow (método del codo) nos puede dar una sugerencia del número ideal.
+
+
+```{r elbow, echo=TRUE, results='hold', message=FALSE, warning=FALSE, error=FALSE, fig.width=5, fig.height=5}
+
+
+mydata <- iris.mod
+wss <- (nrow(mydata)-1)*sum(apply(mydata, 2, var))
+  for (i in 2:15) wss[i] <- sum(kmeans(mydata, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab=" Número de clusters",
+     ylab="Sumas de cuadrados dentro de los grupos",
+     main="Nº de clusters óptimo según Elbow",
+     pch=20, cex=2)
+
+
+```
+
+
+La gráfica intenta explicar la variación entre los clusters (suma de cuadrados). A partir del tercero la variación es muy pequeña, así que el número óptimo es k=3.
+
+### Clustering K-Means
+
+Aplicamos entonces k-means con k=3:
+
+```{r kmeans, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+set.seed(1234)
+kmeans.clust <- kmeans(iris.mod, 3)
+kmeans.clust
+
+
+```
+
+---------------------------------------
+
+El resultaado nos da mucha información:
+
+- El tamaño o número de elementos de cada cluster: kmeans.clust.size
+
+- Los centroides de cada cluster: kmeans.clust.centers
+
+- A qué cluster corresponde ada observación en el dataset (se mantiene el orden del dataset inicial): kmeans.clust.cluster
+
+- El cuadrado de la suma de las distancias de todos los puntos al centroide de su cluster (WCSS): kmeans.clust.withinss
+
+---------------------------------------
+
+Vamos a comparar el resultado del método con la clasificación de las flores iniciales para ver si existe relación:
+
+
+```{r compare, echo=TRUE, results='axis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+table(iris$Species, kmeans.clust$cluster)
+
+
+```
+
+
+Observamos que la variedad setosa corresponde con el cluster 1, la versicolor al cluster 2 y (algo menos obvio) la virgínica al 3.
+
+Una representación gráfica sólo teniendo en cuenta las variables de los pétalos nos da una idea de donde se encuentran los centroides:
+
+
+```{r plot, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE, fig.width=5, fig.height=5}
+
+
+plot(iris.mod %>% select(Petal.Length, Petal.Width), col=kmeans.clust$cluster)
+points(as.data.frame(kmeans.clust$centers) %>% select(Petal.Length, Petal.Width),
+       col=1:3, pch=8, cex=2)
+
+
+```
+
+
+Incluso podemos dibujar un plot confrontando las cuatro variables (las dos de los sépalos y las dos de los pétalos).
+
+```{r plot2, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE, fig.width=8, fig.height=8}
+
+
+plot(iris.mod, col=kmeans.clust$cluster)
+
+
+```
+
+
+Mediante un gráfico radial (o también conocido como gráfico de araña) presentamos los datos de una forma más elegante.
+
+
+```{r radial_plot, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE, fig.width=5, fig.height=5}
+
+
+radial.plot(kmeans.clust$centers[1,], labels=names(kmeans.clust$centers[1,]),
+            rp.type="s",
+            radial.lim=c(0.8),
+            point.symbols=13,
+            point.col="red",
+            mar=c(2, 1, 5, 2))
+
+
+```
+
+
+Para obtener el resultado final del dataset original junto con el cluster al que se le ha asignado utilizamos la función mutate() de dplyr. Así creamos una nueva columna correspondiente con el valor del cluster para cada observación obtenido del vector clusterizado.
+
+
+```{r mutate, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+iris.final <- iris %>% mutate(cluster_id=kmeans.clust$cluster)
+kable(head(iris.final))
+
+
+```
+
+
+### Otros algoritmos de clustering particionado
+
+- PAM
+
+- CLARA

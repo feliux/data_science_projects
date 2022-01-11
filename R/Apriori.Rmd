@@ -1,0 +1,247 @@
+---
+title: "Algoritmo Apriori en R"
+author: "Félix Rodríguez Lagonell"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+En este informe haremos un ejemplo de implementación de algoritmo apriori en R.
+
+
+### Instalación de librerías
+
+Cargamos las librerías para el análisis de reglas de asociación arules y para la visualización de rsultados arulesViz.
+
+```{r path, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+if (! "arules" %in% installed.packages()) install.packages("arules", dependencies=TRUE)
+if (! "arulesViz" %in% installed.packages()) install.packages("arulesViz", dependencies=TRUE)
+library(arules)
+library(arulesViz)
+library(knitr)
+
+
+```
+
+### Carga de datos
+
+Por simplicidad cargaremos el dataset "Groceries" del paquete arules, el cual contiene las transacciones de un grupo de compras. Si inspeccionamos la clase podemos ver que es de tipo 'transactions'.
+
+```{r data, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+data("Groceries")
+class(Groceries)
+
+
+```
+
+Utilizando la función summary() vemos un resumen del contenido del dataset.
+
+```{r summarising, echo=TRUE, results='asis', message=FALSE, warning=FALSE,  error=FALSE}
+
+
+summary(Groceries)
+
+
+```
+
+---------------------------------------
+
+Básicamente contiene 9835 transacciones=filas (compras) y 169 columnas (elementos o productos). 
+
+No siempre tendremos los datos en formato 'transactions', por lo que arules cuenta con la función as("transactions") para pasar de listas o dataframes a un objeto de este tipo. A continuación mostraremos un ejemplo para pasar un dataframe en modo filas (transid1, element1), (transid2, element2) ... (transidn, elementn) que es como solemos almacenar la información en las tablas de las bases de datos relacionales.
+
+
+```{r example, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+a_df3 <- data.frame(TID = c(1, 1, 2, 2, 2, 3), item = c("a", "b", "a", "b", "c", "b"))
+a_df3
+trans4 <- as(split(a_df3[, "item"], a_df3[, "TID"]), "transactions")
+trans4
+
+
+```
+
+---------------------------------------
+
+Volviendo al dataset 'Groceries', podemos ver qué pinta tienen las tres primeras transacciones. Utilizamos la función inspect() del paquete arules junto con la función head() para limitar el número de registros a mostrar
+
+
+```{r inspect, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+# inspect(Groceries[1:3])
+
+inspect(head(Groceries, n=3))
+
+
+```
+
+
+
+### Análisis exploratorio
+
+Iniciamos un breve análisis exploratorio para ver las principales características de nuestro dataset. En primer lugar vamos a ver el conjunto de elementos que lo forma
+
+```{r labels, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+itemLabels(Groceries)
+
+
+```
+
+
+Veamos la gráfica de la distribución de los elementos del dataset. En este caso los 10 más comprados.
+
+
+```{r frequency_plot, echo=TRUE, results='hold', message=FALSE, warning=FALSE, error=FALSE, fig.width=8, fig.height=8}
+
+
+itemFrequencyPlot(Groceries, topN=20, col="blue", cex.names=.65)
+
+
+```
+
+
+La leche entera está en el 25% de las compras.
+
+Si queremos filtrar las compras en las que se adquiere un producto en particular podemos utilizar la función subset() con alguna condición. Por ejemplo todas las compras en las que se adquieren periódicos.
+
+
+```{r subset, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE}
+
+
+news <- subset(Groceries, items %in% "newspapers")
+dim(news)
+
+
+```
+
+```{r news, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE, fig.width=8, fig.height=8}
+
+
+itemFrequencyPlot(news, topN=20, population=Groceries, col="green", cex.names=.65)
+
+
+```
+
+En 785 de las 9835 compras se adquieren periódicos. También podemos ver una gráfica de las distribuciones de productos en el subconjunto de compras en las que se adquieren periódicos frente a lo que ocurre en el total de compras. El porcentaje de compras donde se adquiere leche cuando también se compran periódicos es mayor que en el general de compras, un total de 30% frente a un 25%
+
+
+### Reglas de asociación
+
+Obtendremos las reglas de asociación con la función apriori(). Recordemos que tenemos que fijar al menos un soporte mínimo. En este caso vamos a quedarnos con las asociaciones que ocurran al menos en 10 compras del dataset completo, que incluye unas 10000. Por tanto minsup=0.001
+
+
+```{r rules, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+# reglas <- apriori(Groceries, parameter=list(support=.001, conf=0.8))
+
+
+reglas <- apriori(Groceries, parameter=list(support=.001))
+summary(reglas)
+
+
+```
+
+
+El detalle a través de la función summary() nos da información muy interesante del conjunto de reglas:
+
+1) Hay 410 reglas que cumplen con la condición del soporte mínimo.
+2) La distribución del tamaño de las reglas (número de productos).
+3) Por defecto aplica la condición de confianza mínima utilizando un valor de 0.8. Si se quiere valor este valor desde el inicio se puede indicar en los parámetros de la función apriori()
+
+También podemos inspeccionar las reglas. En este caso las vamos a ordenar para que salgan las más relevantes arriba.
+
+
+```{r rules2, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+inspect(sort(reglas, by="lift")[1:20])
+
+
+```
+
+---------------------------------------
+
+Si queremos quedarnos con las reglas que cumplen criterios mínimos de soporte y confianza e incluyan algún producto en particular (newspaper)...
+
+
+```{r rules3, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+inspect(subset(reglas, items %in% "newspapers"))
+
+
+```
+
+---------------------------------------
+
+En este caaso sólo 4 reglas que asocian periódicos con otros productos cumplen con los criterios de soporte y confianza.
+
+Se podría selecionar las reglas que cumplen con los criterios de soporte y confianza, pero que no contengan un determinado artículo...
+
+
+```{r rules4, echo=TRUE, results='asis', message=FALSE, warning=FALSE, error=FALSE}
+
+
+subset(reglas, !items %in% "newspapers")
+
+
+```
+
+
+Como es obvio, por lo que habíamos visto anteriormente, que teníamos 410 reglas en total y había 4 conteniendo newspaper, ahora tenemos 406 que no contienen dicho producto.
+
+
+### Visualizaciones
+
+Veamos algunas visualizaciones con la librería arulesViz. 
+
+Empezamos con un gráfico que muestra como se distribuyen las reglas en base a las variables de soporte, confianza y lift.
+
+
+```{r plot, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE, fig.width=5, fig.height=5}
+
+
+plot(reglas)
+
+
+```
+
+
+A continuación un diagrama de bolas muy sencillo de interpretar. En el eje horizontal están representados los miembros LHS (izquierda) de la regla y en el eje vertical los RHS (derecha). Cuanto mayor es el radio de la bola mayor es el soporte de la regla y cuanto más anaranjado el color mayor es el lift.
+
+
+```{r plot_balls, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE, fig.width=8, fig.height=8}
+
+
+plot(reglas, method="grouped", control=list(k=15, col=heat.colors(10)))
+
+
+```
+
+Las reglas más importantes serán aquellas con un radio de bola mayor y que tuvieran un color más intenso, como es el caso de (liquor => bottled beer).
+
+Otra visualización bastante utilizada es representar las reglas en modo grafo.
+
+
+```{r plot_graph, echo=TRUE, message=FALSE, results='hold', warning=FALSE, error=FALSE, fig.width=10, fig.height=10}
+
+
+plot(sort(reglas, by="lift")[1:20], method="graph", control=list(type="items"))
+
+
+```
+
+### Otros algoritmos de reglas de asociación
+
+- ECLAT (Equivalence CLAss Transformation)
+
+- arulesNBMiner
+
+- FP-Growth

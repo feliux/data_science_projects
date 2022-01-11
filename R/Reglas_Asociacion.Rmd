@@ -1,0 +1,167 @@
+---
+title: "Reglas de Asociacion"
+output:
+  html_document: default
+  word_document: default
+---
+
+Se cargan las librerias para el an�lisis de reglas de asociaci�n arules 
+y para la visualizaci�n de resultados arulesViz
+```{r}
+if(! "arules" %in% installed.packages()) install.packages("arules", depend = TRUE)
+if(! "arulesViz" %in% installed.packages()) install.packages("arulesViz", depend = TRUE)
+library(arules)
+library(arulesViz)
+```
+
+
+Cargamos el dataset con las transacciones que representan compras y que se encuentra en el paquete arules. Si inspeccionamos la clase vemos que es del tipo transactions
+```{r}
+data("Groceries")
+class(Groceries)
+```
+
+Utilizando la funci�n summary, como en otros objetos vemos un resumen de lo que contiene 
+```{r}
+summary(Groceries)
+
+```
+B�sicamente contiene 9835 transacciones=filas (compras) y 169 columnas (elementos o productos)
+
+Pero no siempre vamos a tener los datos en formato "transactions" por lo que arules cuenta con la funci�n as( "transactions") para pasar de listas o dataframes a un objeto de este tipo. Vemos a continuaci�n un ejemplo para pasar de un dataframe en modo filas (transid1, element1), (transid2, element2) . (transidn, element1).
+```{r}
+a_df3 <- data.frame(TID = c(1,1,2,2,2,3), item=c("a","b","a","b","c", "b"))
+a_df3
+trans4 <- as(split(a_df3[,"item"], a_df3[,"TID"]), "transactions")
+trans4
+
+```
+
+
+
+
+Pero veamos que pinta tienen las tres primeras transacciones que tiene el objeto Groceries. Utilizamos para ello la funci�n inspect() del paquete arules junto con la funci�n head() o la notaci�n de vectores t�pica de R con []
+```{r}
+inspect(head(Groceries, n=3))
+inspect(Groceries[1:3])
+```
+
+Iniciamos un breve exploratorio para ver las principales caracter�sticas de nuestro dataset. En primer lugar vamos a ver el conjunto de elementos que lo forma: I = {i1,i2...in} con la funci�n itemLabels 
+```{r}
+itemLabels(Groceries)
+
+```
+
+Ahora veamos la gr�fica de la distribuci�n de los elementos en el dataset.En este caso los 10 m�s comprados. Funci�n itemFrecuencyPlot con topN=20
+```{r}
+itemFrequencyPlot(Groceries, topN=20, col="blue", cex.names=.65)
+
+```
+
+�La leche entera (whole milk) est� en el 25% de las compras!
+
+
+Si queremos filtrar las compras en las que se adquiere un producto en particular podemos utilizar la funci�n subset con alguna condici�n. Por ejemplo todas las compras en las que se adquieren peri�dicos (newspapers)
+```{r}
+compra_newspapers <- subset(Groceries, items %in% "newspapers")
+dim(compra_newspapers)
+
+```
+En 785 de las 9835 compras se adquieren peri�dicos
+Tambi�n podemos ver una gr�fica de las distribuciones de productos en el subconjunto de compras en las que se adquiere peri�dicos frente a lo que ocurre en el total de compras
+```{r}
+itemFrequencyPlot(compra_newspapers, topN = 20, population = Groceries, col="green", cex.names=.65)
+
+```
+
+Incluso el porcentaje de compras donde se adquiere leche entera (whole milk) cuando tambi�n se adquieren peri�dicos (newspapers) es mayor que en el general de compras (m�s de un 30% frente a un 25%) 
+
+Hasta ahora s�lo hemos explorado el dataset, ahora vamos a aplicar la funci�n apriori() para obtener las Reglas de Asociaci�n. Recordemos que tenemos que fijar al menos un soporte m�nimo, en este caso vamos a quedarnos con las asociaciones que ocurran al menos en 10 compras del dataset completo que incluye unas 10000. Por tanto minsup=0.0001
+```{r}
+reglas_asoc <- apriori(Groceries, parameter = list(support = .001))
+summary(reglas_asoc)
+
+```
+
+El detalle a trav�s de la funci�n summary() nos da informaci�n muy interesante del conjunto de reglas, entre otras cosas que hay 410 reglas que cumplen con la condici�n del soporte m�nimo, la distribuci�n del tama�o de las reglas (n�mero de productos) y que por defecto aplica la condici�n de confianza m�nima utilizando un valor de 0.8. Si se quiere fijar tambi�n este valor desde el inicio se puede indicar en los par�metros de la funci�n apriori(): parameter = list(support = .001, conf = 0.8)
+
+Tambi�n podemos inspeccionar las reglas, en este caso las vamos a ordenar por lift para que salgan las m�s relevantes arriba y nos quedamos con las 20 primeras
+```{r}
+ inspect(sort(reglas_asoc, by="lift")[1:20])
+
+```
+
+Si queremos quedarnos con las reglas que cumplen los criterios m�nimos de soporte y confianza y adem�s incluyan alg�n producto en particular (newspapers) la funci�n subset() tambi�n funciona con Reglas
+```{r}
+inspect(subset(reglas_asoc, items %in% "newspapers"))
+
+```
+En este caso s�lo cuatro reglas que asocian newspapers con otros productos cumplen con los criterios de soporte y confianza m�nima
+
+Tambi�n se podr�an seleccionar las Reglas que cumplen con los criterios de soporte y confianza, pero que en este caso no contengan un determinado art�culo. Simplemente a�adiendo a la condici�n de la funci�n subset() el s�mbolo de negaci�n en R, la exclamaci�n (!)
+```{r}
+subset(reglas_asoc, !items %in% "newspapers")
+
+```
+Como es obvio por lo que hemos visto anteriormente, que ten�amos 410 reglas en total y hab�a 4 conteniendo newspapers, ahora tenemos 406 que no contienen dicho producto
+
+Visualizaciones con la librer�a arulesViz.Empezamos con un gr�fico que une el soporte, la confianza y el lift permitiendo ver como se distribuyen las reglas
+```{r}
+plot(reglas_asoc)
+
+```
+
+A continuaci�n un diagrama de bolas muy sencillo de interpretar. En el eje horizontal est�n representados los miembros LHS (izquierda) de la regla y en el eje vertical los RHS (derecha). Cuanto mayor es el radio de la bola mayor es el soporte de la regla y cuanto m�s anaranjado el color mayor es el lift
+```{r}
+plot(reglas_asoc, method = "grouped", control = list(k = 15, col = heat.colors(10)))
+
+```
+
+Las reglas m�s importantes ser�an aquellas con un radio de bola mayor y que tuvieran un color m�s intenso, como es el caso de {liquor,(otro producto que se simboliza con +1)} => {bottled beer}, como hemos visto cuando las hemos ordenado por lift
+
+Se puede hacer el gr�fico interactivo incluyendo el par�metro interactive=TRUE en la llamada a la funci�n plot(). Esto te permite inspeccionar las reglas seleccion�ndolas en el grafo y ver mayor detalle de las mismas (zoom it). Para ello una vez generada la gr�fica es necesario primero elegir el t�rmino que se quiere analizar y despu�s seleccionar la acci�n (inspect, zoom in, zoom out) 
+
+Otra visualizaci�n bastante utilizada es representar las Reglas en modo grafo, aunque desde mi punto de vista bastante menos clara que la anterior.
+```{r}
+plot(sort(reglas_asoc, by="lift")[1:20], method = "graph", control = list(type = "items"))
+
+```
+
+
+Hay otras muchos m�s tipos de gr�ficas en el paquete arulesViz que pueden ser �tiles aunque a veces complicadas de interpretar. Aqu� hemos utilizado las m�s comunes pero te animamos a que sigas investigando por tu cuenta.
+
+Vemos otro ejemplo con el dataset del titanic: http://www.rdatamining.com/data/titanic.raw.rdata?attredirects=0&d=1
+
+```{r}
+titanic.raw <- read.csv("data/titanic.csv")
+
+titanic.raw$Class <- as.factor(titanic.raw$Class)
+titanic.raw$Sex <- as.factor(titanic.raw$Sex)
+titanic.raw$Age <- as.factor(titanic.raw$Age)
+titanic.raw$Survived <- as.factor(titanic.raw$Survived)
+
+str(titanic.raw)
+
+summary(titanic.raw)
+
+```
+
+Aplicamos el algoritmo apriori sobre el dataframe para obtener el conjunto de Reglas de Asociacion
+```{r}
+rules.titanic <- apriori(titanic.raw)
+inspect(rules.titanic)
+```
+
+Ahora filtramos para ver las reglas en las que la variable Survived aparece sola en el segundo t�rmino de la Regla, es decir que suele implicar que un viajero sobreviva o no
+
+```{r}
+rules.surv.titanic <- apriori(titanic.raw, parameter = list(minlen=2, supp=0.005, conf=0.8), appearance = list(rhs=c("Survived=No", "Survived=Yes"),default="lhs"), control = list(verbose=F))
+rules.surv.titanic.sorted <- sort(rules.surv.titanic, by="lift")
+inspect(rules.surv.titanic.sorted)
+```
+
+Vemos otro tipo de visualizaci�n
+```{r}
+plot(rules.surv.titanic.sorted, method="graph", control=list(type="items"))
+
+```

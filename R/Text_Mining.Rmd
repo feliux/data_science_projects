@@ -1,0 +1,184 @@
+---
+title: "Text Mining"
+output: html_document
+---
+
+
+Cargamos las librer�as necesarias para ejecutar el ejemplo de topic modeling con tm:
+httr, XML, topicmodels, tidyr, dplyr, stringi, ggplot2 y wordcloud
+```{r}
+if(! "tm" %in% installed.packages()) install.packages("tm", depend = TRUE)
+if(! "httr" %in% installed.packages()) install.packages("httr", depend = TRUE)
+if(! "XML" %in% installed.packages()) install.packages("XML", depend = TRUE)
+if(! "topicmodels" %in% installed.packages()) install.packages("topicmodels", depend = TRUE)
+if(! "tidyr" %in% installed.packages()) install.packages("tidyr", depend = TRUE)
+if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
+if(! "stringi" %in% installed.packages()) install.packages("stringi", depend = TRUE)
+if(! "wordcloud" %in% installed.packages()) install.packages("wordcloud", depend = TRUE)
+if(! "ggplot2" %in% installed.packages()) install.packages("ggplot2", depend = TRUE)
+
+library(tm)
+library(topicmodels)
+library(dplyr)
+library(tidyr)
+library(httr)
+library(XML)
+library(stringi)
+library(wordcloud)
+library(ggplot2)
+
+```
+
+
+Obtemos los t�tulos de cada una de las urls del listado referentes a M�sica, Deporte y Viajes
+```{r}
+
+get_title <- function(l) {
+  message(l$domain)
+  tryCatch({
+    html <- GET(as.character(l$domain))
+  }, error = function(err) {
+    message("Error")
+  })
+  cont = content(html, as="text")
+  parsedHTML <- htmlParse(cont, asText=TRUE)
+  title <- xpathSApply(parsedHTML,"//title",xmlValue)
+  message(length(title))
+  if(length(title) > 1) {
+    title <- title[1]
+  } else if (length(title) == 0) {
+    title <- "No Title"
+  }
+  mutate(l,docs = title)
+}
+
+domains_train <- read.csv("data/domains_train.txt")
+domains_train$domain <- paste("http://",domains_train$domain,sep="")
+
+train_set <- do.call(rbind, lapply(split(domains_train, f=as.factor(domains_train$domain)),get_title))
+
+titles <- select(train_set, docs)
+head(titles)
+
+```
+
+Creamos un corpus de documentos a partir del dataframe de t�tulos de las p�ginas web usando la funci�n DataframeSource(). Cada t�tulo va a representar un documento del corpus
+```{r}
+
+ds <- DataframeSource(titles)
+docs <- Corpus(ds)
+inspect(head(docs))
+
+```
+
+Limpiamos los datos ayud�ndonos de la funci�n tm_map() que nos permite realizar muchas operaciones de acondicionamiento de datos directamente sobre los documentos del corpus
+La funci�n content_transformer() nos da acceso directamente al texto almacenado en cada documento
+```{r}
+mi.stopwords <- c(stopwords('spanish'), "onlin", "and", "for")
+  
+docs.clean <- docs %>% 
+#Quitamos las marcas < > del texto
+  tm_map(content_transformer(function(x) stri_replace_all_regex(x, "<.+?>", " "))) %>% 
+# Quitamos los tabuladores del texto
+  tm_map(content_transformer(function(x) stri_replace_all_fixed(x, "\t", " "))) %>%
+# Almacenamos el contenido en texto plano
+  tm_map(PlainTextDocument) %>%
+# Eliminamos los espacios en blanco de m�s
+  tm_map(stripWhitespace) %>%
+# Quitamos las palabras demasiado comunes (stopwords) definidas en un diccionario
+  tm_map(removeWords, stopwords("spanish")) %>%
+# Eliminamos los signos de puntuaci�n
+  tm_map(removePunctuation) %>%
+# Pasamos el texto a min�sculas
+  tm_map(content_transformer(tolower)) %>%
+# Nos quedamos �nicamente con la ra�z de las palabras (stemming)
+  tm_map(stemDocument, language="spanish") %>%
+# Quitamos algunas palabras que nosostros mismos hayamos considerado stopwords
+  tm_map(removeWords, mi.stopwords)
+  
+```
+
+Obtenemos ahora los t�rminos m�s frecuentes en el corpus y hacemos una representaci�n gr�fica. Para ello construimos una matriz en la que las filas representan los documentos y las columnas las palabras halladas en ellos. Utilizamos la funci�n TermDocumentMatrix() para pasar del corpus a la matriz
+```{r}
+
+# Obtenemos una matriz T�rminos x Documentos
+docsTDM <- TermDocumentMatrix(docs.clean)
+dim(docsTDM)
+
+#Vemos los cinco primeros t�rminos
+#inspect(docsTDM[1:5,])
+
+# Obtenemos los t�rminos con al menos 5 ocurrencias en los t�tulos de las p�ginas web
+freq.terms <- findFreqTerms(docsTDM, lowfreq = 5)
+freq.terms
+
+# Pero, representamos los t�rminos con al menos 3 ocurrencias
+term.freq <- rowSums(as.matrix(docsTDM))
+term.freq <- subset(term.freq, term.freq >= 3)
+df.term.freq <- data.frame(term = names(term.freq), freq = term.freq)
+
+ggplot(df.term.freq, aes(x = term, y = freq)) + geom_bar(stat = "identity") +
+xlab("Terms") + ylab("Count") + coord_flip()
+
+```
+
+
+Para encontrar asociaciones entre t�rminos utilizamos la funci�n findAssocs()
+```{r}
+findAssocs(docsTDM, "hotel", 0.4)
+
+```
+
+
+Tambi�n podemos generar una nube de palabras con la funci�n wordcloud(). En este caso se representan las palabras que hayan aparecido como m�nimo en dos t�tulos de URLs
+```{r}
+
+
+matrix.docsTDM <- as.matrix(docsTDM)
+# calcula las frecuencias de las palabras
+list.terms <- sort(rowSums(matrix.docsTDM), decreasing=TRUE)
+term.names <- names(list.terms)
+pal <- brewer.pal(9, "BuGn")
+pal <- pal[-(1:4)]
+df.wordcloud <- data.frame(word=term.names, freq=list.terms)
+wordcloud(df.wordcloud$word, df.wordcloud$freq, min.freq=2, colors = pal)
+
+```
+
+Realizamos un clustering jer�rquico para ver como se agrupan las palabras. Quitamos los t�rminos que aparezcan demasiado poco con la funci�n removeSparseTerms()
+```{r}
+#Quitamos los t�rminos m�s spare
+docsTDM.sparse <- removeSparseTerms(docsTDM, sparse = 0.95)
+docsTDM.sparse.matrix <- as.matrix(docsTDM.sparse)
+dim(docsTDM.sparse.matrix)
+
+dist.matrix <- dist(scale(docsTDM.sparse.matrix))
+hcluster <- hclust(dist.matrix, method = "ward.D")
+
+plot(hcluster)
+rect.hclust(hcluster, k = 4)
+
+```
+
+Aunque el clutering ya nos da una pista muy buena, por �ltimo realizamos el topic modelling aplicando la funci�n LDA() del paquete topicmodels
+```{r}
+
+dtm <- as.DocumentTermMatrix(docsTDM.sparse)
+dtm.clean <- dtm[rowSums(inspect(dtm)) != 0,]
+
+# Obtenemos 4 topics en este caso
+lda <- LDA(dtm.clean, k = 4) 
+
+# Extraemos los 6 t�rminos principales por topico
+terms <- terms(lda, 6) # Mostrar los 6 t�rminos m�s representativos de cada topic
+terms
+
+# Listamos el t�pico caracter�stico de cada documento (t�tulo de URL en este caso)
+lda.topics <- as.matrix(topics(lda))
+head(lda.topics)
+
+# Vemos las probabilidades de cada t�rmino de pertenecer a un t�pico
+prob.term <- posterior(lda)$terms
+prob.term
+
+```

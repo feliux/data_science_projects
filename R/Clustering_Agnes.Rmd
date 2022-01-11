@@ -1,0 +1,108 @@
+---
+title: "Clustering Agnes"
+output: html_document
+---
+
+Se cargan las librerias para el clustering jer�rquico y el acondicionamiento de datos
+```{r}
+if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
+if(! "cluster" %in% installed.packages()) install.packages("cluster", depend = TRUE)
+
+library(dplyr)
+library(cluster)
+
+```
+
+Utilizamos un dataset con datos sobre econom�a y demograf�a de pa�ses europeos para el clustering
+
+Lo obtenemos de (http://www.instantr.com/wp-content/uploads/2013/01/europe.csv)
+
+```{r}
+europe <- read.csv("data/europe.csv")
+
+summary(europe)
+
+# Quitamos la variable Country para no tenerla en cuenta en el clustering
+europe.mod <- europe %>% select(-Country)
+```
+
+Aplicamos el m�todo de clustering hclust y representamos el dendrograma
+```{r}
+set.seed(1234)
+
+hc.clust <- hclust(dist(europe.mod), method = "ave")
+plot(hc.clust, hang = -1, labels = europe$Country)
+
+# se corta el arbol en cinco grupos en la gr�fica
+rect.hclust(hc.clust, k = 5)
+
+# se obtienen los elementos que forman esos 5 grupos
+cutree(hc.clust, k=5)
+
+
+```
+
+Seg�n los resultados y siempre teniendo en cuenta esas variables, Suecia y Espa�a aparecen muy juntas en uno de los clusters, Ucrania y Luxemburgo aparecen solos en su propio grupo y luego hay otros dos grupos con distintos pa�ses seg�n se puede ver claramente en el gr�fico
+
+Ahora aplicamos el m�todo de clustering agnes del paquete cluster y representamos el dendrograma con la funci�n plot de la librer�a dendroextras para colorear los clusters
+```{r}
+
+set.seed(1234)
+
+dim(europe.mod)
+
+agnes.clust <- agnes(x=europe.mod, diss = FALSE, stand = TRUE, method = "average")
+summary(agnes.clust)
+
+dend.agnes <-as.dendrogram(agnes.clust)
+
+if(! "dendroextras" %in% installed.packages()) install.packages("dendroextras", depend = TRUE)
+library(dendroextras)
+
+#labels(dend.agnes)<- as.character(europe$Country)
+labels(dend.agnes)<- as.character(europe$Country[agnes.clust$order])
+# Con la variable K podemos establecer el n�mero de colores
+plot(colour_clusters(dend.agnes, k=8), xlab="")
+
+agnes.clust$order
+agnes.clust$ac
+#europe[row_number() == agnes.clust$order, ]
+#europe[agnes.clust$order,]
+#agnes.clust$height > 4.0
+
+
+```
+```{r}
+
+idsamp <- sample(1:dim(iris)[1], 30)
+iris.samp <- iris[idsamp, ]
+iris.mod <- iris.samp %>% select(-Species)
+
+agnes.clust <- agnes(x=iris.mod, diss = FALSE, stand = TRUE, method = "average")
+#summary(agnes.clust)
+
+agnes.clust$order
+
+dend.agnes <-as.dendrogram(agnes.clust)
+plot(colour_clusters(dend.agnes, k=4), xlab="")
+
+# plot(dend.agnes)
+
+```
+```{r}
+#labels(dend.agnes)<- as.character(agnes.clust$order)
+labels(dend.agnes)<- as.character(iris.samp$Species[agnes.clust$order])
+plot(colour_clusters(dend.agnes, k=4), xlab="")
+
+# cl <- cutree(as.hclust(agnes.clust), h=1)
+
+#cl <- cutree(as.hclust(agnes.clust), k=3)
+#cl
+
+hc <- as.hclust(agnes.clust)
+hc$order
+hc$labels
+cl <- cutree(hc, k=3)
+cl
+
+```

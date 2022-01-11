@@ -1,0 +1,279 @@
+---
+title: "Regresion Lineal"
+output: html_document
+---
+
+## Regresi�n lineal simple
+Cargamos el dataset faithful y las librer�as necesarias para alguno de los algoritmos de regresi�n lineal
+```{r}
+
+if(! "pls" %in% installed.packages()) install.packages("pls", depend = TRUE)
+
+data(faithful)
+
+library(pls)
+```
+
+Hacemos un summary() y un head() para ver su contenido
+```{r}
+summary(faithful)
+head(faithful)
+```
+
+
+Representamos gr�ficamente la relaci�n entre las dos variables: eruptions (duration) vs waiting (tiempo de espera entre erupciones)
+```{r, echo=FALSE}
+plot(faithful$waiting, faithful$eruptions,col="blue",xlab="Tiempo entre erupciones",ylab="Duracion de la Erupcion")
+```
+
+Veamos con la funci�n cor() la correlaci�n entre ambas variables. Nos dar� una pista de cuan bueno va a ser el predictor, cuanto m�s se acerque a la unidad querr� decir que m�s relacionadas est�n las variables y m�s f�cil resultar� ajustar una buena predicci�n
+```{r}
+cor(faithful$waiting, faithful$eruptions)
+```
+
+La correlaci�n es bastante alta en este caso
+
+A partir del dataset original vamos a crear un conjunto de entrenamiento para que el modelo genere su modelo lineal a partir del mismo y otro de test para ver como de bien es capaz de predecir sobre otro conjunto de datos diferente al de entrenamiento
+```{r}
+set.seed(13579)
+train.sample <- sample(1:272,size=(180),replace=F)
+train.faithful <- faithful[train.sample,]
+test.faithful <- faithful[-train.sample,]
+dim(train.faithful)
+head(train.faithful)
+
+```
+Podemos observar que tenemos dos datasets (para entrenamiento y test) de las mismas caracter�sticas que el dataset original
+
+Entrenamos el modelo con la funci�n lm() con la que se implementa el algoritmo Ordinary Least Squares Regression como ya hemos comentado anteriormente
+```{r}
+lineal.reg.model <- lm(eruptions ~ waiting,data=train.faithful)
+summary(lineal.reg.model)
+
+```
+Hemos creado el modelo y los coeficientes resultantes B0 = -1.8721 y B1 = 0.07533
+La f�rmula de regresi�n resultado ser�a: eruptions = -1.8721 + 0.07533 * waiting
+
+Dado que estamos en un espacio bidimensional veamos una representaci�n gr�fica de como se ajusta el modelo (la recta) a los puntos del dataset de test que es el que utilizaremos para medir su bondad
+```{r echo=FALSE}
+plot(test.faithful$waiting, test.faithful$eruptions,col="red",xlab="Tiempo entre erupciones",ylab="Duracion de la Erupcion")
+# Con la funci�n abline pintamos la recta de regresi�n pas�ndole el modelo generado
+abline(lineal.reg.model)
+
+```
+Se v� claramente en la figura que la predicci�n, que ser�a el valor marcado por la recta, no es exacto ni mucho menos, pero en muchos de los casos se trata de una muy buena aproximaci�n
+
+Podemos obtener m�s detalles del modelo utilizando la funci�n attributes
+```{r}
+attributes(lineal.reg.model)
+
+```
+
+Vamos a ver de nuevo el valor de los coeficientes utilizando el atributo $coefficients y la funci�n coef()
+```{r}
+lineal.reg.model$coefficients
+coef(lineal.reg.model)
+
+```
+
+Si quisieramos predecir el valor de la duraci�n de la erupci�n para un nuevo valor de tiempo entre erupciones podr�amos montar la ecuaci�n con los coeficientes y aplicarla a ese nuevo valor. Supongamos que tenemos un tiempo entre erupciones de 70 minutos
+```{r}
+
+# Ser�a lo mismo: duracion.pred = lineal.reg.model$coefficients[1] + lineal.reg.model$coefficients[2] * 70
+duracion.pred <- coef(lineal.reg.model)[1] + coef(lineal.reg.model)[2] * 70 
+unname(duracion.pred)
+
+```
+
+Pero hay una forma mucho m�s elegante de obtener una predicci�n y es usar la funci�n predict()
+```{r}
+#Creamos un dataset con s�lo la variable predictora (waiting)
+datonuevo <- data.frame(waiting=c(70))
+duracion.pred2 <- predict(lineal.reg.model,datonuevo)
+duracion.pred2
+
+```
+
+El resultado para la predicci�n es exactamente igual. Si se quiere hacer una predicci�n sobre una lista de datos nuevos bastar� crear un dataframe con varios valores en la columna waiting
+
+Por �ltimo vamos a comparar el RSE (Residual Standard Error) en el dataset de entrenamiento y en el de test para compararlos. Se podr�a hacer con la funci�n rmse() del paquete Metrics, pero lo vamos a hacer directamente aplicando la f�rmula a ambos datasets
+```{r}
+rse.train = sqrt(sum((lineal.reg.model$fitted-train.faithful$eruptions)^2) / (dim(train.faithful)[1] - 2))
+rse.train
+
+# En realidad fitted - la erupcion real de las observaciones son los residuos
+rse.train2 = sqrt(sum((lineal.reg.model$residuals)^2) / (dim(train.faithful)[1] - 2))
+rse.train2
+
+rse.test = sqrt(sum((predict(lineal.reg.model,newdata=test.faithful)-test.faithful$eruptions)^2) / (dim(test.faithful)[1] -2))
+rse.test
+
+```
+El RSE del conjunto de training es mayor que el de test, a pesar de que los puntos deber�an estar m�s ajustados que el de test. Se puede deber al efecto random
+
+Con la funci�n plot() obtenemos cuatro gr�ficas que nos dan informaci�n sobre la bondad del modelo
+```{r}
+par(mfrow=c(2,2))
+plot(lineal.reg.model)
+
+```
+
+
+## Regresi�n Lineal Multivariable
+
+Para el ejemplo de regresi�n multivariable seleccionamos el paquete longley http://stat.ethz.ch/R-manual/R-devel/library/datasets/html/longley.html con 7 variables econ�micas y se trata de predecir el n�mero de empleados en base a dichas variables. Son todas variables de tipo num�rico
+```{r}
+data(longley)
+dim(longley)
+summary(longley)
+
+```
+
+Vemos la correlaci�n entre variables
+```{r}
+cor(longley)
+pairs(longley)
+
+```
+
+Tanto en la tabla como en el gr�fico se ve que el n�mero de empleados (Employed) tiene una correlaci�n bastante alta con las variables Year, Population, GNP y GNP.deflator. En las gr�ficas se puede observar perfectamente que en esos casos los puntos parecen seguir pr�cticamente una l�nea recta
+
+Creamos  el conjunto de entrenamiento y de test a partir del dataset original
+```{r}
+set.seed(1234)
+train.sample <- sample(1:16,size=(10),replace=F)
+train.longley <- longley[train.sample,]
+test.longley <- longley[-train.sample,]
+dim(train.longley)
+head(train.longley)
+
+```
+
+Son dataset bastante peque�os pero nos sirven muy bien para ver como funciona la regresi�n lineal
+
+Entrenamos el modelo con la funci�n lm() (algoritmo Ordinary Least Squares Regression) para obtener los coeficientes de la regresi�n lineal
+```{r}
+lineal.reg.model.multi <- lm(Employed ~ .,data=train.longley)
+summary(lineal.reg.model.multi)
+
+```
+
+N�tese que en la funci�n lm(), en vez de escribir todas las variables de entrada (GNP, Unemployed ...) hemos colocado un punto (.) que simboliza "todas las variables"
+
+Los coeficientes resultantes para este modelo a partir de los datos de entrenamiento son B0 = -6.306e+03, B1 = 1.978e-02, B2 = -1.374e-01, B3 = -3.717e-02, B4 = -1.307e-02, B5 = 5.709e-01, B6 = 3.259e+00. La notaci�n e+ o e- es equivalente a 10 elevado a la... es decir e-02 = 10-2 = 0,01
+
+Y la f�rmula de regresi�n completa por tanto: Employed =  -6.306e+03 + 1.978e-02 * GNP.deflactor -1.374e-01 * GNP -3.717e-02 * Unemployed -1.307e-02 * Armed.Forces + 5.709e-01 Population + 3.259e+00 * Year
+
+Podemos observar que los dos coeficientes mayores y por tanto que m�s peso e influencia tendr�n en el resultado final son la poblaci�n (Population) y el a�o en el que nos encontremos (Year)
+
+Por �ltimo obtenemos una predicci�n usando la funci�n predict(), por lo que tenemos que crear un dataframe con una observaci�n sobre la que queramos hacer la predicci�n y que contenga todas las variables. En este caso vamos a intentar la predicci�n para el a�o 1963 que es el primero que no aparece en la serie de observaciones con valores inventados para las variables de entrada, pero con cierto sentido siguiendo las tendencias de los a�os anteriores
+
+```{r}
+#Creamos un dataset con las variables predictoras
+nueva.obs <- data.frame(GNP.deflator=c(118), GNP=c(560), Unemployed=c(410), Armed.Forces=c(290), Population = c(135.000), Year=c(1963))
+empleados.pred <- predict(lineal.reg.model.multi,nueva.obs)
+empleados.pred
+
+```
+
+El resultado que nos da: Employed = 75.85193 ser�a la predicci�n de empleabilidad para el a�o 1963. Una potente herramienta sin duda y que funciona bien siempre y cuando alguna de las variables influyentes y que no est�n contempladas en el modelo cambien alter�ndolo dr�sticamente. �A que ahora se te ocurrir�an muchas cosas que predecir?
+
+
+Hasta el momento s�lamente hemos utilizado datasets con variables num�ricas, pero �que ocurre si entre los predictores hay variables categ�ricas? Vamos a utilizar para ver esto el dataset ToothGrowth http://stat.ethz.ch/R-manual/R-devel/library/datasets/html/ToothGrowth.html que observa el crecimiento de los dientes de las cobayas utilizando un determinado tipo de suplemento y distintas dosis de dicho suplemento
+
+```{r}
+data(ToothGrowth)
+dim(ToothGrowth)
+summary(ToothGrowth)
+head(ToothGrowth)
+
+```
+
+Utilizando la funci�n str() podemos ver la estructura de los campos del dataset ToohGrowth
+```{r}
+str(ToothGrowth)
+
+```
+
+Vemos en este caso que la variable supp (suplemento) es una variable categ�rica (factor) con dos posibles valores (leves) que son OJ y VC
+
+Utilizando la funci�n boxplot() podemos ver una representaci�n gr�fica muy clara de lo que influye cada variable predictora en el crecimiento de los dientes que es la variable objetivo (target)
+```{r}
+
+boxplot(len~supp*dose, col=(c("gold","darkgreen")), data=ToothGrowth, main="Crecimiento dientes cobayas", xlab="Tipo de Suplemento (OJ, VC) y dosis (0.5,1,2)", ylab="Longitud de los Dientes")
+
+```
+
+En la figura se puede ver que a misma dosis de suplemento, las cobayas que toman el de tipo OJ (amarillo) experimentan un mayor crecimiento en sus dientes, sobre todo cuando est�n tomando dosis m�s peque�as
+
+Como en los ejemplos anteriores creamos el conjunto de entrenamiento y test a partir del dataset original
+```{r}
+set.seed(1234)
+train.sample <- sample(1:60,size=(40),replace=F)
+train.ToothGrowth <- ToothGrowth[train.sample,]
+test.ToothGrowth <- ToothGrowth[-train.sample,]
+dim(train.ToothGrowth)
+head(train.ToothGrowth)
+
+```
+
+Y construimos el modelo con lm()
+```{r}
+lineal.reg.model.cat <- lm(len ~ .,data=train.ToothGrowth)
+summary(lineal.reg.model.cat)
+
+```
+
+Aqu� vemos la principal diferencia con los modelos anteriores y es que en el segundo coeficiente (B1) aparece el nombre de la variable (supp) concatenado con uno de sus posibles valores (vc). La forma de interpretar esto es la siguiente: cuando el suplemento sea vc se aplicar� la f�rmula Y = B0 + B1 + B2 * X2 o m�s concretamente en este caso len = 8.756 -3.646 + 9.801 * dose, mientras que cuando el suplemento sea oj no se aplica el valor de B1, quedando Y = B0 + B2X2 (len = 8.756 + 9.801 * dose).
+Si la variable categ�rica tuviera m�s valores aparecer�an tantos coeficientes como niveles menos uno, pues se sobreentiende que uno de ellos se toma como el valor referencia (en el caso anterio oj)
+
+Realicemos la predicci�n con ambos suplementos para una misma dosis y as� ver la diferencia
+```{r}
+
+#Creamos dos datasets con las variables predictoras (uno por cada suplemento)
+nueva.obs.oj <- data.frame(supp=c('OJ'), dose=c(1.0))
+nueva.obs.vc <- data.frame(supp=c('VC'), dose=c(1.0))
+
+oj.pred <- predict(lineal.reg.model.cat,nueva.obs.oj)
+oj.pred
+
+vc.pred <- predict(lineal.reg.model.cat,nueva.obs.vc)
+vc.pred
+
+oj.pred - vc.pred
+
+```
+
+Como preve�amos despu�s de observar la gr�fica de la figura el crecimiento con el suplemento OJ es mayor que con el suplemento VC con la misma dosis (1.0). La diferencia justo es el valor del coeficiente suppvc que aplicamos en la f�rmula de regresi�n cuando la variable supp=VC y que no aplicamos cuando supp=OJ.
+
+## Otros algoritmos de regresi�n lineal
+
+Stepwize Linear Regression
+```{r}
+# modelo base lineal.reg.model.multi
+# summarize the fit
+summary(lineal.reg.model.multi)
+# perform step-wise feature selection
+SLR.model <- step(lineal.reg.model.multi)
+# summarize the selected model
+summary(SLR.model)
+
+```
+
+Principal Component Regression
+```{r}
+
+lineal.reg.model.pcr <- pcr(Employed ~ .,data=train.longley, validation="CV")
+
+summary(lineal.reg.model.pcr)
+
+```
+
+Partial Least Squares Regression
+```{r}
+
+lineal.reg.model.plsr <- plsr(Employed ~ .,data=train.longley, validation="CV")
+
+summary(lineal.reg.model.plsr)
+
+```

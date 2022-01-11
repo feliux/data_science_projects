@@ -1,0 +1,126 @@
+---
+title: "Regresion Logistica"
+output: html_document
+---
+
+## Regresi�n log�stica
+Cargamos el dataset del Titanic (versi�n kaggle)
+```{r}
+
+if(! "dplyr" %in% installed.packages()) install.packages("dplyr", depend = TRUE)
+if(! "ROCR" %in% installed.packages()) install.packages("ROCR", depend = TRUE)
+
+titanic <- read.csv("data/titanic.csv",header=T,na.strings=c(""))
+
+library(dplyr)
+library(ROCR)
+
+```
+
+Hacemos str() para ver la estructura del objeto, summary() para ver la distribuci�n de sus variables, dim() para ver las dimensiones y head() para ver el contenido del dataset de entrenamiento y test
+```{r}
+str(titanic)
+summary(titanic)
+head(titanic)
+dim(titanic)
+```
+
+Realizamos un peque�o an�lisis exploratorio para ver los valores �nicos de cada variable y los desconocidos (NA) 
+```{r}
+
+sapply(titanic,function(x) sum(is.na(x)))
+sapply(titanic,function(x) length(unique(x)))
+
+```
+
+Se puede ver que hay una observaci�n por pasajero, as� que no hay que hacer mayor transformaci�n en ese sentido y podemos eliminar la variable PassengerId, Name, Ticket y Cabin del modelo si las usamos tal cual por ser variables categ�ricas con multiples valores lo que no hace si no aportar complejidad al modelo haci�ndolo inviable
+```{r}
+titanic.clean <- titanic %>% select(-PassengerId, -Name, -Ticket, -Cabin)
+
+```
+
+Para terminar de acondicionar los datos vamos a tratar los valores desconocidos (NA). Viendo los resultados del exploratorio anterior vemos que hay NA en la edad (Age) y el embarque (Embarked)
+```{r}
+# La edad de las observaciones desconocidas la sustituimos por la media
+titanic.clean$Age[is.na(titanic.clean$Age)] <- mean(titanic.clean$Age,na.rm=T)
+
+# Las observaciones con Embarked desconocido las eliminamos directamente
+titanic.clean <- titanic.clean[!is.na(titanic.clean$Embarked),]
+
+# Quitamos tambi�n el n�mero de observaci�n (rowname)
+rownames(titanic.clean) <- NULL
+
+```
+
+
+Para que la regresi�n funcione es necesario que las variables categ�ricas sean factores. Si observamos la salida que obtuvimos de la funci�n str() vemos que las variables Sex y Embarked son factores
+
+Creamos los conjuntos de entrenamiento y test
+```{r}
+set.seed(12345)
+train.sample <- sample(1:889,size=(800),replace=F)
+train.titanic <- titanic.clean[train.sample,]
+test.titanic <- titanic.clean[-train.sample,]
+dim(train.titanic)
+head(train.titanic)
+dim(test.titanic)
+
+```
+
+
+Entrenamos el modelo de regresi�n log�stica con la funci�n glm() y aplicando el par�metro family=binomial
+```{r}
+
+logistic.reg.model <- glm(Survived ~.,family=binomial,data=train.titanic)
+summary(logistic.reg.model)
+
+```
+
+
+Aplicamos el modelo al conjunto de test para obtener las predicciones para esas observaciones
+```{r}
+
+test.class.output <- predict(logistic.reg.model,newdata=test.titanic,type='response')
+head(test.class.output)
+
+```
+
+Lo que obtenemos en realidad es un vector con el porcentaje de que la clase de Supervived sea 1. Para considerar lo que es 0/1 vamos a fijar el criterio de que los que tengan el porcentaje mayor de 0.5 son 1s y los que tengan menos de 0.5 son ceros
+
+```{r}
+
+test.class.output <- ifelse(test.class.output > 0.5,1,0)
+head(test.class.output)
+
+```
+
+Ahora ya podemos calcular la precisi�n (porcentaje de aciertos) de nuestro modelo aplic�ndolo al conjunto de test
+```{r}
+
+clasif.error <- mean(test.class.output != test.titanic$Survived)
+clasif.error
+
+precision <- 1 - clasif.error
+precision
+
+```
+
+
+Curva ROC
+```{r}
+
+pr <- prediction(test.class.output, test.titanic$Survived)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+
+
+```
+
+
+
+
+
