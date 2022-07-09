@@ -1,0 +1,7 @@
+streamlit
+spacy
+chatterbot
+chatterbot_corpus
+numpy
+sklearn
+nltk
