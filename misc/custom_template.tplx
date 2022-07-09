@@ -1,0 +1,13 @@
+((*- extends 'article.tplx' -*))
+
+((* block author *))
+\author{Félix}
+((* endblock author *))
+
+((* block title *))
+\title{Time Series Forecasting}
+((* endblock title *))
+
+((* block date *))  
+\date{19 noviembre 2020}   
+((* endblock date *))
