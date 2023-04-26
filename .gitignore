@@ -1,1 +1,10 @@
+# paths
+.ipynb_checkpoints/
+.*env
+
+# files
+*.whl
+*.pyc
 *checkpoint.ipynb
+*keys*
+*secret*
