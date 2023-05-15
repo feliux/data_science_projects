@@ -1,17 +1,16 @@
 version: '3'
 
 services:
-  ds-lab:
-    container_name: ds-lab
-    image: jupyter/all-spark-notebook:latest
+  pytorch:
+    container_name: pytorch-gpu
+    image: feliux/gpu-scipy-pytorch-notebook:1.0.0
     ports:
-      - "8888:8888"
+      - 8888:8888
     volumes:
       - ./data:/home/jovyan/work/data
-      - ./spark:/home/jovyan/work/spark
       - ./pytorch:/home/jovyan/work/pytorch
       - ./images:/home/jovyan/work/images
-      - ./notebooks:/home/jovyan/work/notebooks
+      - ./tensorflow:/home/jovyan/work/tensorflow
     networks:
       - data-science
 
