@@ -1,9 +1,17 @@
-# This creates a feature vector from a URLclass UrlFeaturizer(object)
+import whois
+import math
+import pandas as pd
+import numpy as np
+from pyquery import PyQuery
+from requests import get
+from datetime import datetime, timezone
 
+
+# https://medium.com/nerd-for-tech/url-feature-engineering-and-classification-66c0512fb34d
 class UrlFeaturizer(object):
     def __init__(self, url):
         self.url = url 
-        self.domain = url.split('//')[-1].split('/')[0]
+        self.domain = url.split("//")[-1].split("/")[0]
         self.today = datetime.now()
         
         try:
@@ -33,43 +41,43 @@ class UrlFeaturizer(object):
         return len(self.url)
     
     def numParameters(self):
-        params = self.url.split('&')
+        params = self.url.split("&")
         return len(params) - 1
     
     def numFragments(self):
-        fragments = self.url.split('#')
+        fragments = self.url.split("#")
         return len(fragments) - 1
     
     def numSubDomains(self):
-        subdomains = self.url.split('http')[-1].split('//')[-1].split('/')
+        subdomains = self.url.split("http")[-1].split("//")[-1].split("/")
         return len(subdomains)-1
     
     def domainExtension(self):
-        ext = self.url.split('.')[-1].split('/')[0]
+        ext = self.url.split(".")[-1].split("/")[0]
         return ext
     
     ## URL domain features
     def hasHttp(self):
-        return 'http:' in self.url 
+        return "http:" in self.url 
 
     def hasHttps(self):
-        return 'https:' in self.url 
+        return "https:" in self.url 
 
     def urlIsLive(self):
         return self.response == 200
     
     def daysSinceRegistration(self):
-        if self.whois and self.whois['creation_date']:
-            diff = self.today - self.whois['creation_date']
-            diff = str(diff).split(' days')[0]
+        if self.whois and self.whois["creation_date"]:
+            diff = self.today - self.whois["creation_date"]
+            diff = str(diff).split(" days")[0]
             return diff
         else:
             return 0
 
     def daysSinceExpiration(self):
-        if self.whois and self.whois['expiration_date']:
-            diff = self.whois['expiration_date'] - self.today
-            diff = str(diff).split(' days')[0]
+        if self.whois and self.whois["expiration_date"]:
+            diff = self.whois["expiration_date"] - self.today
+            diff = str(diff).split(" days")[0]
             return diff
         else:
             return 0
@@ -77,13 +85,13 @@ class UrlFeaturizer(object):
     ## URL Page Features
     def bodyLength(self):
         if self.pq is not None:
-            return len(self.pq('html').text()) if self.urlIsLive else 0
+            return len(self.pq("html").text()) if self.urlIsLive else 0
         else:
             return 0
 
     def numTitles(self):
         if self.pq is not None:
-            titles = ['h{}'.format(i) for i in range(7)]
+            titles = ["h{}".format(i) for i in range(7)]
             titles = [self.pq(i).items() for i in titles]
             return len([item for s in titles for item in s])
         else:
@@ -91,25 +99,25 @@ class UrlFeaturizer(object):
 
     def numImages(self):
         if self.pq is not None:
-            return len([i for i in self.pq('img').items()])
+            return len([i for i in self.pq("img").items()])
         else:
             return 0
 
     def numLinks(self):
         if self.pq is not None:
-            return len([i for i in self.pq('a').items()])
+            return len([i for i in self.pq("a").items()])
         else:
             return 0
         
     def scriptLength(self):
         if self.pq is not None:
-            return len(self.pq('script').text())
+            return len(self.pq("script").text())
         else:
             return 0
         
     def specialCharacters(self):
         if self.pq is not None:
-            bodyText = self.pq('html').text()
+            bodyText = self.pq("html").text()
             schars = [i for i in bodyText if not i.isdigit() and not i.isalpha()]
             return len(schars)
         else:
@@ -138,23 +146,23 @@ class UrlFeaturizer(object):
         
     def run(self):
         data = {}
-        data['entropy'] = self.entropy()
-        data['numDigits'] = self.numDigits()
-        data['urlLength'] = self.urlLength()
-        data['numParams'] = self.numParameters()
-        data['hasHttp'] = self.hasHttp()
-        data['hasHttps'] = self.hasHttps()
-        data['urlIsLive'] = self.urlIsLive()
-        data['bodyLength'] = self.bodyLength()
-        data['numTitles'] = self.numTitles()
-        data['numImages'] = self.numImages()
-        data['numLinks'] = self.numLinks()
-        data['scriptLength'] = self.scriptLength()
-        data['specialChars'] = self.specialCharacters()
-        data['ext'] = self.domainExtension()
-        data['dsr'] = self.daysSinceRegistration()
-        data['dse'] = self.daysSinceExpiration()
-        data['sscr'] = self.scriptToSpecialCharsRatio()
-        data['sbr'] = self.scriptTobodyRatio()
-        data['bscr'] = self.bodyToSpecialCharRatio()
+        data["entropy"] = self.entropy()
+        data["numDigits"] = self.numDigits()
+        data["urlLength"] = self.urlLength()
+        data["numParams"] = self.numParameters()
+        data["hasHttp"] = self.hasHttp()
+        data["hasHttps"] = self.hasHttps()
+        data["urlIsLive"] = self.urlIsLive()
+        data["bodyLength"] = self.bodyLength()
+        data["numTitles"] = self.numTitles()
+        data["numImages"] = self.numImages()
+        data["numLinks"] = self.numLinks()
+        data["scriptLength"] = self.scriptLength()
+        data["specialChars"] = self.specialCharacters()
+        data["ext"] = self.domainExtension()
+        data["dsr"] = self.daysSinceRegistration()
+        data["dse"] = self.daysSinceExpiration()
+        data["sscr"] = self.scriptToSpecialCharsRatio()
+        data["sbr"] = self.scriptTobodyRatio()
+        data["bscr"] = self.bodyToSpecialCharRatio()
         return data
