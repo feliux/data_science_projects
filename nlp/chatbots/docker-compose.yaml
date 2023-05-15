@@ -9,7 +9,7 @@ services:
     image: chatbot:0.0.1
     restart: always
     entrypoint: tail -f /dev/null #streamlit run app.py
-      - "8501:8501"
+      - 8501:8501
     volumes:
       - ./app:/tmp
     networks:

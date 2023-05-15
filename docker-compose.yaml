@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  ds-lab:
+    container_name: ds-lab # docker exec -it ds-lab jupyter-notebook list
+    image: jupyter/scipy-notebook:python-3.8.8
+    ports:
+      - 8888:8888
+    volumes:
+      - ./cybersecurity:/home/jovyan/work/cybersecurity
+      - ./data:/home/jovyan/work/data
+      - ./etl:/home/jovyan/work/etl
+      - ./graphs:/home/jovyan/work/graphs
+      - ./images:/home/jovyan/work/images
+      - ./misc:/home/jovyan/work/misc
+      - ./nlp:/home/jovyan/work/nlp
+      - ./notebooks:/home/jovyan/work/notebooks
+      - ./timeseries:/home/jovyan/work/timeseries
+    networks:
+      - data-science
+
+networks:
+  data-science:
