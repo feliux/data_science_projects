@@ -14,12 +14,15 @@ En este repositorio se muestran más de veinte ejercicios prácticos diferentes 
 3. **Regresión y Clasificación**
 	- [Regresión Lineal: Predicción del coste de un incidente de seguridad](Regresion_Lineal_Prediccion_Coste_Incidente_Seguridad.ipynb)
 	- [Regresión Logística: Detección de correos de SPAM](Regresion_Logistica_Deteccion_SPAM.ipynb)
+	- [Regresión Logística: Detección de ataques de red](Deteccion_Ataques_Red_Avanzado.ipynb)
 4. **Support Vector Machines (SVM)**
 	- [SVM: Detección de URLs maliciosas](SVM_Deteccion_URLs_Maliciosas.ipynb)
 5. **Árboles de decisión**
 	- [Árboles de decisión: Detección de malware en Android](Arboles_Decision_Deteccion_Malware_En_Android.ipynb)
-	- [Random Forest: Detección de malware en Android](Random_Forests_Deteccion_Malware_En_Android.ipynb)
+	- [Árboles de decisión: Detección de ataques de red](Deteccion_Ataques_Red_Avanzado.ipynb)
 	- [Árboles de decisión (Spark): Detección de correos de phishing](Arboles_Decision_Spark_Phishing.ipynb)
+	- [Random Forest: Detección de malware en Android](Random_Forests_Deteccion_Malware_En_Android.ipynb)
+	- [Random Forest: Detección de ataques de red](Deteccion_Ataques_Red_Avanzado.ipynb)
 6. **Clustering**
 	- [KMEANS: Detección de transacciones bancarias fraudulentas](KMEANS_Deteccion_Transacciones_Bancarias_Fraudulentas.ipynb)
 	- [DBSCAN: Detección de transacciones bancarias fraudulentas](DBSCAN_Deteccion_Transacciones_Bancarias_Fraudulentas.ipynb)
