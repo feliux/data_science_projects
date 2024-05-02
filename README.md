@@ -1,6 +1,6 @@
-# My Notebooks
+# ML Lab
 
-This reposotory contains some of my big data & data science projects.
+This reposotory contains some of my projects related to machine learning & data science.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ $ cd notebook
 
 #### Spark
 
-This notebooks runs over [jupyter/all-spark-notebook](https://hub.docker.com/r/jupyter/all-spark-notebook) image.
+Notebooks runs over [jupyter/all-spark-notebook](https://hub.docker.com/r/jupyter/all-spark-notebook) image.
 
 - Pull the image from Docker Hub
 
